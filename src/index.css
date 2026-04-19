@@ -1,0 +1,71 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Poppins', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #EEF0F6;
+  color: #021942;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #EFF0F4;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #8ECBDE;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2948D9;
+}
+
+/* Selección de texto */
+::selection {
+  background: #2948D9;
+  color: white;
+}
+
+/* Links */
+a {
+  color: #2948D9;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Focus visible para accesibilidad */
+*:focus-visible {
+  outline: 2px solid #2948D9;
+  outline-offset: 2px;
+}
+
+button:focus-visible {
+  outline: 2px solid #2948D9;
+  outline-offset: -2px;
+}
