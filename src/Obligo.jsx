@@ -228,60 +228,54 @@ const CLIENTS_INIT=[
 
 // ─── CLIENTES LASER SOLUTIONS ─────────────────────────────────────
 // Empleado extendido para liquidación de sueldos (módulo Sueldos)
-const mkEmpL=(o={})=>mkEmp({ingreso:"",horario:"",snisAd:1.5,noct:false,...o});
+const mkEmpL=(o={})=>mkEmp({ingreso:"",horario:"",snisAd:1.5,noct:false,nombres:"",apellidos:"",nroContrato:"",...o});
 const CLIENTS_LASER=[
   mk(101,"Gabriela Martínez SAS","sas","servicios",{...mkTax("irae","basica",true),iraeEsFicto:true},{
-    giro:"Residenciales de adultos mayores (Palermo y Blanes)",rut:"219035810010",numEmpresa:"7.755.330",
-    grupoMTSS:"15.4",grupoSubgrupo:"Grupo 15 / Subgrupo 4",phone:"098372261",whatsapp:"+598098372261",startDate:"2021-10-14",
+    giro:"Residenciales de adultos mayores (Palermo y Blanes) — 87300",rut:"219035810010",numEmpresa:"7.755.330",
+    grupoMTSS:"15/4",grupoSubgrupo:"Grupo 15 / Subgrupo 4",phone:"24085583 · 098979748",whatsapp:"+598098979748",
+    email:"sales@lasersolutions.com",startDate:"2021-10-14",cierreBalance:"31/12",efactura:"activo",
     hasEmployees:true,domicilio:"Av. Gral. Rivera 2287, Montevideo",
-    notes:"SAS: FONASA obligatorio para la directora (Gabriela Martínez, titular). IRAE ficto + IVA 22% + IP. Declaración anual de beneficiario final ante BCU (Ley 19.484).",
+    notes:"SAS con acciones nominativas. Inscripción DGI 14/10/2021 · RNC 16591 (18/10/2021). Obligaciones DGI: IRAE + IVA general + Patrimonio (desde 14/10/2021). Emisor electrónico desde 13/12/2024. Cierre de balance 31/12. Sucursal: Juan Manuel Blanes 965 (local 3, desde 14/01/2025). Domicilio constituido: Serrato 3647/102. Representante legal: Gabriela Verónica Martínez Rodríguez (RUT 212334200012). FONASA obligatorio para la directora + declaración anual de beneficiario final ante BCU (Ley 19.484).",
     employees:[
-      mkEmpL({id:1,name:"Alicia Ivonne Rodríguez Seguessa",ci:"4.631.030-8",cargo:"Cuidadora",sueldo:33959.20,ingreso:"2024-10-15",horario:"8hs flex - Desc. 1 día c/5 trab.",snisAd:3}),
-      mkEmpL({id:2,name:"Natalia Salomé Videla Platukis",ci:"4.840.373-7",cargo:"Cuidadora",sueldo:33958.66,ingreso:"2022-09-22",horario:"Mar a Dom de 14 a 22hs (flexible)",snisAd:3}),
-      mkEmpL({id:3,name:"Fátima Yanina Ceppi González",ci:"5.203.613-0",cargo:"Cuidadora",sueldo:32987.28,ingreso:"2024-04-24",horario:"8hs flexible - Desc. 1 día c/5 trab.",snisAd:1.5}),
-      mkEmpL({id:4,name:"Lourdes Catherine Rodríguez",ci:"4.365.170-5",cargo:"Cuidadora",sueldo:29681.28,ingreso:"2024-03-08",horario:"22 a 06hs - Desc. 1 día c/5 trab.",snisAd:3,noct:true}),
-      mkEmpL({id:5,name:"Eneida Marina Rojas",ci:"6.592.259-4",cargo:"Cuidadora",sueldo:29674,ingreso:"2025-02-01",horario:"8 horas, libra los jueves",snisAd:3,noct:true}),
-      mkEmpL({id:6,name:"Dianela Torres Garrido",ci:"6.691.678-6",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-02-06",horario:"Rotativo, 8hs, 5 días y descansa 1",snisAd:1.5}),
-      mkEmpL({id:7,name:"Carmen Katherine González Rosario",ci:"6.408.726-4",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-05-08",horario:"15 a 22hs, desc. 1 día c/5 trab.",snisAd:1.5}),
-      mkEmpL({id:8,name:"María Tamay Camacho Arrieta",ci:"6.408.674-3",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-05-08",horario:"De 14 a 22hs, rotativo",snisAd:1.5}),
-      mkEmpL({id:9,name:"Valeria Vázquez Sánchez",ci:"4.503.642-0",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-06-01",horario:"Desc. 1 día c/5, a demanda de sucursal",snisAd:1.5}),
-      mkEmpL({id:10,name:"Katherine Fiorella González González",ci:"5.219.070-0",cargo:"Cuidadora",sueldo:32214.42,ingreso:"2025-08-05",horario:"5 días semanales y 1 de descanso",snisAd:1.5}),
-      mkEmpL({id:11,name:"María Fernanda Fernández Basso",ci:"5.027.965-3",cargo:"Cuidadora",sueldo:34139.31,ingreso:"2024-06-03",horario:"14 a 22hs - 1 día libre c/5 trab.",snisAd:3}),
-      mkEmpL({id:12,name:"Patricia Mariana Grajales Cancela",ci:"3.047.159-6",cargo:"Cuidadora",sueldo:32826.70,ingreso:"2025-10-12",horario:"De miércoles a lunes",snisAd:3}),
-      mkEmpL({id:13,name:"María Ruth Peñaloza Soria",ci:"5.411.933-4",cargo:"Cuidadora",sueldo:31686,ingreso:"2026-03-23",horario:"14 a 22hs, 5 días y descansa 1",snisAd:3}),
-    ],
-    tasks:[
-      {id:1,label:"BPS nómina mensual",due:"2026-07-10",done:false,freq:"mensual",cat:"bps"},
-      {id:2,label:"DJ IVA mensual (2178)",due:"2026-07-22",done:false,freq:"mensual",cat:"dgi"},
-      {id:3,label:"BCU – Declaración beneficiario final (Ley 19.484)",due:"2026-12-31",done:false,freq:"anual",cat:"otro"},
+      mkEmpL({id:1,name:"Alicia Ivonne Rodríguez Seguessa",nombres:"Alicia Ivonne",apellidos:"Rodríguez Seguessa",ci:"4.631.030-8",cargo:"Cuidadora",sueldo:33959.20,ingreso:"2024-10-15",horario:"8hs flex - Desc. 1 día c/5 trab.",snisAd:3}),
+      mkEmpL({id:2,name:"Natalia Salomé Videla Platukis",nombres:"Natalia Salomé",apellidos:"Videla Platukis",ci:"4.840.373-7",cargo:"Cuidadora",sueldo:33958.66,ingreso:"2022-09-22",horario:"Mar a Dom de 14 a 22hs (flexible)",snisAd:3}),
+      mkEmpL({id:3,name:"Fátima Yanina Ceppi González",nombres:"Fátima Yanina",apellidos:"Ceppi González",ci:"5.203.613-0",cargo:"Cuidadora",sueldo:32987.28,ingreso:"2024-04-24",horario:"8hs flexible - Desc. 1 día c/5 trab.",snisAd:1.5}),
+      mkEmpL({id:4,name:"Lourdes Catherine Rodríguez",nombres:"Lourdes Catherine",apellidos:"Rodríguez",ci:"4.365.170-5",cargo:"Cuidadora",sueldo:29681.28,ingreso:"2024-03-08",horario:"22 a 06hs - Desc. 1 día c/5 trab.",snisAd:3,noct:true}),
+      mkEmpL({id:5,name:"Eneida Marina Rojas",nombres:"Eneida Marina",apellidos:"Rojas",ci:"6.592.259-4",cargo:"Cuidadora",sueldo:29674,ingreso:"2025-02-01",horario:"8 horas, libra los jueves",snisAd:3,noct:true}),
+      mkEmpL({id:6,name:"Dianela Torres Garrido",nombres:"Dianela",apellidos:"Torres Garrido",ci:"6.691.678-6",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-02-06",horario:"Rotativo, 8hs, 5 días y descansa 1",snisAd:1.5}),
+      mkEmpL({id:7,name:"Carmen Katherine González Rosario",nombres:"Carmen Katherine",apellidos:"González Rosario",ci:"6.408.726-4",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-05-08",horario:"15 a 22hs, desc. 1 día c/5 trab.",snisAd:1.5}),
+      mkEmpL({id:8,name:"María Tamay Camacho Arrieta",nombres:"María Tamay",apellidos:"Camacho Arrieta",ci:"6.408.674-3",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-05-08",horario:"De 14 a 22hs, rotativo",snisAd:1.5}),
+      mkEmpL({id:9,name:"Valeria Vázquez Sánchez",nombres:"Valeria",apellidos:"Vázquez Sánchez",ci:"4.503.642-0",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-06-01",horario:"Desc. 1 día c/5, a demanda de sucursal",snisAd:1.5}),
+      mkEmpL({id:10,name:"Katherine Fiorella González González",nombres:"Katherine Fiorella",apellidos:"González González",ci:"5.219.070-0",cargo:"Cuidadora",sueldo:32214.42,ingreso:"2025-08-05",horario:"5 días semanales y 1 de descanso",snisAd:1.5}),
+      mkEmpL({id:11,name:"María Fernanda Fernández Basso",nombres:"María Fernanda",apellidos:"Fernández Basso",ci:"5.027.965-3",cargo:"Cuidadora",sueldo:34139.31,ingreso:"2024-06-03",horario:"14 a 22hs - 1 día libre c/5 trab.",snisAd:3}),
+      mkEmpL({id:12,name:"Patricia Mariana Grajales Cancela",nombres:"Patricia Mariana",apellidos:"Grajales Cancela",ci:"3.047.159-6",cargo:"Cuidadora",sueldo:32826.70,ingreso:"2025-10-12",horario:"De miércoles a lunes",snisAd:3}),
+      mkEmpL({id:13,name:"María Ruth Peñaloza Soria",nombres:"María Ruth",apellidos:"Peñaloza Soria",ci:"5.411.933-4",cargo:"Cuidadora",sueldo:31686,ingreso:"2026-03-23",horario:"14 a 22hs, 5 días y descansa 1",snisAd:3}),
     ]}),
   mk(102,"Gabriela Martínez Unipersonal","unipersonal","industria_comercio",mkTax("ninguno","minimo"),{
     giro:"Fábrica de pastas frescas — Bel Mangiare",rut:"212334200012",numEmpresa:"1.886.112",
     grupoMTSS:"1/12.2",grupoSubgrupo:"Grupo 1 / Sub. 12 / Cap. 2",startDate:"1990-10-08",phone:"22167512",
-    hasEmployees:true,antigTope:0.05,domicilio:"José Serrato 3647 apto. A, Montevideo",
-    notes:"Literal E: exonerada de IRAE, paga IVA Mínimo fijo mensual (Form. 2908). No aplica Impuesto al Patrimonio. Prima por antigüedad G01 S12.2 (tope 5%).",
+    hasEmployees:true,antigTope:0.05,domicilio:"Ing. José Serrato 3647 apto. A, Montevideo",
+    notes:"Literal E: exonerada de IRAE, paga IVA Mínimo fijo mensual (Form. 2908, $5.910 en 2026). No aplica Impuesto al Patrimonio. Empresa BPS desde 08/10/1990. Prima por antigüedad G01 S12.2 (tope 5%). Gabriela también figura como titular en la SAS (representante legal).",
     employees:[
-      mkEmpL({id:1,name:"Florencia Micaela Machado Sequeira",ci:"5.312.962-1",cargo:"Supervisor / Oficial",sueldo:39459.94,ingreso:"2019-08-01",horario:"Mié a Dom de 8 a 15hs",snisAd:1.5}),
-      mkEmpL({id:2,name:"Karina Elizabeth Salnicov Sosa",ci:"3.681.126-3",cargo:"Empleada de mostrador",sueldo:33572.49,ingreso:"2023-07-07",horario:"Mar a Dom de 8 a 15hs",snisAd:1.5}),
-      mkEmpL({id:3,name:"Franco Andrés Nuñez Martínez",ci:"5.228.101-0",cargo:"Chofer",sueldo:56580,ingreso:"2023-10-09",horario:"Mar a Sáb de 11 a 18hs (flexible)",snisAd:1.5}),
-      mkEmpL({id:4,name:"Jonathan Gabriel De Souza Del Ducca",ci:"5.295.828-9",cargo:"Repartidor en birrodado",tipo:"jornalero",jornal:1053.34,ingreso:"2025-10-14",horario:"Dom de 10 a 14hs",snisAd:0}),
-    ],
-    tasks:[
-      {id:1,label:"BPS nómina mensual",due:"2026-07-10",done:false,freq:"mensual",cat:"bps"},
-      {id:2,label:"IVA Mínimo – pago fijo mensual (2908)",due:"2026-07-22",done:false,freq:"mensual",cat:"dgi"},
+      mkEmpL({id:1,name:"Florencia Micaela Machado Sequeira",nombres:"Florencia Micaela",apellidos:"Machado Sequeira",ci:"5.312.962-1",cargo:"Supervisor / Oficial",sueldo:39459.94,ingreso:"2019-08-01",horario:"Mié a Dom de 8 a 15hs",snisAd:1.5,nroContrato:"3"}),
+      mkEmpL({id:2,name:"Karina Elizabeth Salnicov Sosa",nombres:"Karina Elizabeth",apellidos:"Salnicov Sosa",ci:"3.681.126-3",cargo:"Empleada de mostrador",sueldo:33572.49,ingreso:"2023-07-07",horario:"Mar a Dom de 8 a 15hs",snisAd:1.5,nroContrato:"9"}),
+      mkEmpL({id:3,name:"Franco Andrés Nuñez Martínez",nombres:"Franco Andrés",apellidos:"Nuñez Martínez",ci:"5.228.101-0",cargo:"Chofer",sueldo:56580,ingreso:"2023-10-09",horario:"Mar a Sáb de 11 a 18hs (flexible)",snisAd:1.5,nroContrato:"11"}),
+      mkEmpL({id:4,name:"Jonathan Gabriel De Souza Del Ducca",nombres:"Jonathan Gabriel",apellidos:"De Souza Del Ducca",ci:"5.295.828-9",cargo:"Repartidor en birrodado",tipo:"jornalero",jornal:1053.34,ingreso:"2025-10-14",horario:"Dom de 10 a 14hs",snisAd:0,nroContrato:"12"}),
     ]}),
-  mk(103,"Lucas Martínez Unipersonal","unipersonal","servicios_personales",mkTax("irpf_cat2","no_aplica"),{
-    giro:"Servicios de marketing",
-    notes:"IRPF Cat. II (rentas de trabajo) + aportes FONASA. IVA: NO aplica (confirmado).",
-    tasks:[{id:1,label:"Anticipo IRPF / FONASA servicios personales",due:"2026-07-22",done:false,freq:"mensual",cat:"dgi"}]}),
+  mk(103,"Lucas Martínez Unipersonal","unipersonal","servicios_personales",mkTax("irpf_cat2","sp"),{
+    giro:"Publicidad / marketing — 73100",rut:"220808140016",startDate:"2026-04-01",cierreBalance:"31/12",
+    phone:"095094921",whatsapp:"+598095094921",email:"lucasmartinezuy@gmail.com",
+    domicilio:"Dr. Luis Piera 2053 ap. 104, Montevideo",
+    notes:"Persona física. Inscripción DGI 25/04/2007; inicio/reinicio de actividades 01/04/2026 (constancia 6951 del 13/04/2026). Obligaciones según consulta RUC 6906: IVA Servicios Personales (Form. 1302) + IRPF Cat. II rentas por trabajo, ambas desde 01/04/2026. Aportes FONASA por servicios personales. Balance: otras actividades 31/12. UAG 62 Montevideo, grupo NOCEDE."}),
   mk(104,"Leandro Rambao Unipersonal","unipersonal","industria_comercio",mkTax(),{
-    giro:"Titular + cónyuge colaborador + 1 empleado",rut:"213415590013",numEmpresa:"3.604.227",
-    grupoMTSS:"5/3",grupoSubgrupo:"Grupo 5 / Subgrupo 3",hasEmployees:true,bsePoliza:"5.457.971",
-    notes:"Régimen tributario A CONFIRMAR (no surge de las planillas; queda todo visible). Cónyuge colaborador registrado en BPS. Póliza BSE 5.457.971.",
+    giro:"Fabricación de otros productos textiles n.c.p.",rut:"213415590013",numEmpresa:"3.604.227",
+    grupoMTSS:"5/3",grupoSubgrupo:"Grupo 5 / Subgrupo 3",hasEmployees:true,bsePoliza:"5457971",
+    startDate:"1996-01-04",phone:"099543214",whatsapp:"+598099543214",email:"leandrorambao@gmail.com",
+    domicilio:"Veinte de Febrero 3011, Montevideo CP 12004",
+    notes:"Régimen tributario DGI A CONFIRMAR (no surge de las planillas; queda todo visible). Empresa BPS desde 04/01/1996. Titulares en planilla: Leandro Rambao Camoirano (CI 2.792.593-8, desde 16/09/2019) + cónyuge colaboradora Claudia Yanet Ramos Silvera (CI 3.451.696-4, desde 01/01/2022). Póliza BSE 5457971. Jornal liquidado $1.181 (base MTSS declarada $1.140).",
     employees:[
-      mkEmpL({id:1,name:"Eric Michel Rambao Ramos",ci:"4.942.847-7",cargo:"Aprendiz (Cat. IX)",tipo:"jornalero",jornal:1181,ingreso:"2024-12-09",horario:"L a V de 9 a 17hs, desc. 12:30 a 13",snisAd:1.5}),
-    ],
-    tasks:[{id:1,label:"BPS nómina mensual (titular + cónyuge + empleado)",due:"2026-07-10",done:false,freq:"mensual",cat:"bps"}]}),
+      mkEmpL({id:1,name:"Eric Michel Rambao Ramos",nombres:"Eric Michel",apellidos:"Rambao Ramos",ci:"4.942.847-7",cargo:"Operario de Mano II (Nivel VII / Cat. IX Aprendiz)",tipo:"jornalero",jornal:1181,ingreso:"2024-12-09",horario:"L a V de 9 a 17hs, desc. 12:30 a 13",snisAd:1.5}),
+    ]}),
   mk(105,"Integra Residenciales","otro","servicios",mkTax(),{
     giro:"Residencial de adultos mayores",specialTag:"Solo Web",efactura:"no_aplica",
     notes:"Cliente solo por servicio web. Campos tributarios en blanco a propósito."}),
@@ -292,7 +286,10 @@ const CLIENTS_LASER=[
     giro:"Persona física — IASS (jubilaciones y pensiones)",specialTag:"Convenio pendiente",efactura:"no_aplica",
     notes:"IASS: impuesto de asistencia a la seguridad social sobre jubilaciones/pensiones. Estado: convenio pendiente de firma."}),
 ];
-const LASER_CONFIG_DEFAULT={studioName:"Laser Solutions",studioCode:"LaserSolutions",studioRut:"",studioEmail:"",studioPhone:"",adminPass:"laser2026",secretariaPass:"ayud123",diaDGI:22,diaBPS:10,bpc:6756,ui:5.9847,iraeMinimoMensual:6550,ivaMinimo:4500,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:22268,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000};
+// Valores vigentes 2026: BPC $6.864 (Dec. 11/026) · SMN $24.572 (Dec. 319/025; desde 1/7/2026: $25.383)
+// IVA Mínimo $5.910 e IRAE mínimo $6.840 (Dec. 310/025) · UI al 12/06/2026: $6,5720 (ajusta a diario, ver BCU/INE)
+const LASER_CONFIG_DEFAULT={studioName:"Laser Solutions",studioCode:"LaserSolutions",studioRut:"",studioEmail:"sales@lasersolutions.com",studioPhone:"",adminPass:"laser2026",secretariaPass:"ayud123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000};
+const LASER_SEED_V="3";
 
 // ─── ETIQUETAS ESPECIALES (Solo Web / Solo Marketing / Convenio pendiente) ───
 const SPECIAL_TAG_COLOR={"Solo Web":"#2948D9","Solo Marketing":"#8E44AD","Convenio pendiente":"#D97706"};
@@ -478,12 +475,12 @@ function LoginScreen({onLogin}){
 // ─── SIDEBAR ──────────────────────────────────────────────────────
 function Sidebar({view,setView,user,onLogout}){
   const {m,open,setOpen}=useR();
-  const nav=[{id:"dashboard",l:"Panel Principal"},{id:"clients",l:"Clientes"},{id:"tareas",l:"Tareas"},{id:"alertas",l:"Alertas"},{id:"calendario",l:"Calendario"},{id:"config",l:"Configuración"}];
+  const nav=[{id:"dashboard",l:"Panel Principal",ic:"📊"},{id:"clients",l:"Clientes",ic:"👥"},{id:"tareas",l:"Tareas",ic:"✅"},{id:"alertas",l:"Alertas",ic:"🔔"},{id:"calendario",l:"Calendario",ic:"📅"},{id:"config",l:"Configuración",ic:"⚙️"}];
   if(m&&!open)return null;
   const navClick=(id)=>{setView(id);if(m)setOpen(false);};
   return<>
     {m&&<div onClick={()=>setOpen(false)} style={{position:"fixed",inset:0,background:"#00000070",zIndex:99}}/>}
-    <div style={{width:192,height:"100vh",background:C.dark,display:"flex",flexDirection:"column",flexShrink:0,position:m?"fixed":"relative",top:0,left:0,zIndex:m?100:0,overflowY:"auto"}}>
+    <div style={{width:236,height:"100vh",background:ACTIVE_STUDIO==="laser"?"linear-gradient(180deg,#021029 0%,#021942 100%)":C.dark,display:"flex",flexDirection:"column",flexShrink:0,position:m?"fixed":"relative",top:0,left:0,zIndex:m?100:0,overflowY:"auto"}}>
       <div style={{padding:"16px 14px 12px",borderBottom:"1px solid #122040",display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
         {ACTIVE_STUDIO==="laser"
           ?<div style={{display:"flex",alignItems:"center",gap:9}}>
@@ -495,8 +492,11 @@ function Sidebar({view,setView,user,onLogout}){
         <div style={{color:"#4B6FA8",fontSize:11,marginTop:2,fontFamily:F}}>VCEstudio</div></div>}
         {m&&<button onClick={()=>setOpen(false)} style={{color:"#6B8FC0",background:"transparent",border:"none",cursor:"pointer",fontSize:20,lineHeight:1,padding:"0 4px",marginTop:-2}}>✕</button>}
       </div>
-      <nav style={{flex:1,paddingTop:6}}>
-        {nav.map(item=>{const active=view===item.id;return<button key={item.id} onClick={()=>navClick(item.id)} style={{width:"100%",textAlign:"left",padding:"9px 14px",background:active?"#1D4ED818":"transparent",border:"none",borderLeft:`2px solid ${active?C.blue:"transparent"}`,color:active?C.white:"#6B8FC0",cursor:"pointer",fontSize:13,fontWeight:active?600:400,fontFamily:F}}>{item.l}</button>;})}
+      <nav style={{flex:1,paddingTop:10,display:"flex",flexDirection:"column",gap:3,padding:"10px 9px 0"}}>
+        {nav.map(item=>{const active=view===item.id;return<button key={item.id} onClick={()=>navClick(item.id)} style={{width:"100%",textAlign:"left",padding:"10px 13px",background:active?C.blue:"transparent",border:"none",borderRadius:9,color:active?"#fff":"#8FA8CE",cursor:"pointer",fontSize:13.5,fontWeight:active?700:500,fontFamily:F,display:"flex",alignItems:"center",gap:10,transition:"background .12s",boxShadow:active?"0 4px 14px #1D4ED844":"none"}}
+          onMouseEnter={e=>{if(!active)e.currentTarget.style.background="#ffffff0d";}} onMouseLeave={e=>{if(!active)e.currentTarget.style.background="transparent";}}>
+          <span style={{fontSize:16,width:20,textAlign:"center",filter:active?"none":"grayscale(35%)"}}>{item.ic}</span>{item.l}
+        </button>;})}
       </nav>
       <div style={{padding:12,borderTop:"1px solid #122040"}}>
         <div style={{color:"#4B6FA8",fontSize:10,fontWeight:600,letterSpacing:1,marginBottom:7,fontFamily:F}}>ACCESOS</div>
@@ -659,7 +659,7 @@ function Dashboard({clients,setClients,setView,openClient,user,proveedores,setPr
 
   return<div style={{padding:m?12:22}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-      <div><h1 style={{margin:0,fontSize:19,fontWeight:700,color:C.navy,fontFamily:F}}>Panel Principal</h1><div style={{color:C.gray,fontSize:12,marginTop:1,fontFamily:F}}>Hoy: 14/04/2026</div></div>
+      <div><h1 style={{margin:0,fontSize:19,fontWeight:700,color:C.navy,fontFamily:F}}>Panel Principal</h1><div style={{color:C.gray,fontSize:12,marginTop:1,fontFamily:F}}>Hoy: {TODAY.split("-").reverse().join("/")}</div></div>
       <PeriodNav period={period} setPeriod={setPeriod}/>
     </div>
 
@@ -1050,84 +1050,133 @@ function numALetras(n){
   if(resto)out+=tres(resto);
   return out.trim();
 }
+// Formato de fecha del recibo de referencia: "01-Ago.-2019"
+const MAB=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Set","Oct","Nov","Dic"];
+function fechaRecibo(iso){if(!iso)return"";const[y,m,d]=iso.split("-");return`${d}-${MAB[+m-1]}.-${y}`;}
+// "1/12.2" -> {g:"1",s:"12.2",tag:"G01S12.2"} · "15.4" -> {g:"15",s:"4",tag:"G15S4"}
+function grupoSub(gm){
+  if(!gm)return{g:"",s:"",tag:""};
+  let g="",s="";
+  if(gm.includes("/")){[g,s]=gm.split("/");}
+  else if(gm.includes(".")){const i=gm.indexOf(".");g=gm.slice(0,i);s=gm.slice(i+1);}
+  else g=gm;
+  return{g,s,tag:"G"+g.padStart(2,"0")+(s?"S"+s:"")};
+}
+function nomYApe(emp){
+  if(emp.nombres||emp.apellidos)return{n:emp.nombres||"",a:emp.apellidos||""};
+  const w=(emp.name||"").split(/\s+/);
+  if(w.length>=4)return{n:w.slice(0,2).join(" "),a:w.slice(2).join(" ")};
+  if(w.length===3)return{n:w.slice(0,2).join(" "),a:w[2]};
+  if(w.length===2)return{n:w[0],a:w[1]};
+  return{n:emp.name||"",a:""};
+}
+const det2=(n)=>{const v=Math.round(n*100)/100;return String(v);};// "40422.4" estilo referencia
 function reciboHTML(client,emp,r,period,via){
-  const row=(d,det,imp)=>`<tr><td>${d}</td><td class="det">${det}</td><td class="num">${imp}</td></tr>`;
+  const[pm,py]=period.split("/");
+  const mesAnio=`${MESES[+pm-1]} ${py}`;
+  const mesCorto=`${MESES[+pm-1]}-${py.slice(2)}`;
+  const gs=grupoSub(client.grupoMTSS);
+  const na=nomYApe(emp);
+  const row=(nom,det,imp)=>`<tr><td class="c1">${nom}</td><td class="c2">${det}</td><td class="c3">${imp}</td></tr>`;
   let hab="",des="";
-  if(r.esJ){hab+=row("Jornales",`${r.jornales} x ${fU(emp.jornal)}`,fU(r.base));}
+  if(r.esJ){hab+=row("Jornal",`${r.jornales} x ${det2(emp.jornal||0)}`,fU(r.base));}
   else{
-    hab+=row("Sueldo básico","",fU(emp.sueldo));
-    if(r.antig>0)hab+=row(`Prima por antigüedad ${Math.round(r.antPct*100)}%`,`${Math.round(r.antPct*100)}% de ${fU(emp.sueldo)}`,fU(r.antig));
-    if(r.noct>0)hab+=row("Prima por nocturnidad","23% de "+fU(r.base+r.antig),fU(r.noct));
-    if(r.faltas>0)hab+=row(`Días de falta (${r.faltasD})`,`${r.faltasD} día${r.faltasD!==1?"s":""}`,"-"+fU(r.faltas));
+    hab+=row("Sueldo Básico","",fU(r.base));
+    if(r.antig>0)hab+=row(`Prima por Antigüedad ${gs.tag}`,`${Math.round(r.antPct*100)} % de ${det2(r.base)}`,fU(r.antig));
+    if(r.noct>0)hab+=row("Prima por Nocturnidad",`23 % de ${det2(r.base+r.antig)}`,fU(r.noct));
+    if(r.faltas>0)hab+=row(`Días de falta (${r.faltasD})`,`${r.faltasD} x ${det2((r.base+r.antig+r.noct)/30)}`,"-"+fU(r.faltas));
   }
-  des+=row("Aporte Jubilatorio","15% de $"+fU(r.gravado),fU(r.jub));
-  des+=row("FRL","0,1% de $"+fU(r.gravado),fU(r.frl));
-  des+=row("Seguro x Enfermedad","3% de $"+fU(r.gravado),fU(r.segEnf));
-  des+=row("Adic. Sist. Nac. Int. de Salud",`${(r.snisPct*100).toFixed(1).replace(".",",")}% de $${fU(r.gravado)}`,fU(r.snis));
+  des+=row("Aporte Jubilatorio",`15 % de ${det2(r.gravado)}`,fU(r.jub));
+  des+=row("FRL",`0.1 % de ${det2(r.gravado)}`,fU(r.frl));
+  des+=row("Seguro x Enfermedad",`3 % de ${det2(r.gravado)}`,fU(r.segEnf));
+  des+=row("Adic. Sist. Nac. Int. de Salud",`${String(r.snisPct*100).replace(".",",").replace(",0","")} % de ${det2(r.gravado)}`,fU(r.snis));
   des+=row("I.R.P.F.","",fU(r.irpf));
-  if(r.adel>0)des+=row("Adelantos sueldo","",fU(r.adel));
-  if(r.prest>0)des+=row(`Cuota préstamo${r.prestLabel?` (${r.prestLabel})`:""}`,"",fU(r.prest));
+  if(r.adel>0)des+=row("Adelantos","SUELDO",fU(r.adel));
+  if(r.prest>0)des+=row(`Cuotas Prestamo${r.prestLabel?` (${r.prestLabel.replace("/"," de ")} )`:""}`,"",fU(r.prest));
+  const dedIRPF=r.aportes+r.irpf;
   return`<div class="recibo">
-    <div class="head">
-      <div class="emp-name">${(client.name||"").toUpperCase()}</div>
-      <div class="head-grid">
-        <span><b>RUT:</b> ${client.rut||"—"}</span>
-        <span><b>BPS:</b> ${(client.numEmpresa||"—").replace(/\./g,"")}</span>
-        <span><b>MTSS:</b> ${client.grupoMTSS||"—"}</span>
-        ${client.bsePoliza?`<span><b>BSE:</b> ${client.bsePoliza}</span>`:""}
-        <span class="periodo">${periodoLargo(period)}</span>
-      </div>
+    <div class="topbox">
+      <div class="empnom">${(client.name||"").toUpperCase()}</div>
+      <table class="toptab"><tr>
+        <td>Dirección: ${client.domicilio||""}</td>
+        <td>BPS: ${(client.numEmpresa||"").replace(/\./g,"")}</td>
+        <td class="mes">${mesAnio}</td>
+      </tr><tr>
+        <td>RUT: ${client.rut||""}</td>
+        <td>BSE: ${client.bsePoliza||""}</td>
+        <td></td>
+      </tr><tr>
+        <td>Grupo / Sub: ${gs.g} /${gs.s}</td>
+        <td colspan="2">Liquidación: ${r.esJ?"Jornales":"Mensualidad"}</td>
+      </tr></table>
     </div>
-    <div class="datos">
-      <div><b>${emp.name||""}</b></div>
-      <div class="dg">
-        <span><b>C.I.:</b> ${emp.ci||"—"}</span>
-        <span><b>Cargo:</b> ${emp.cargo||"—"}</span>
-        <span><b>Ingreso:</b> ${emp.ingreso?emp.ingreso.split("-").reverse().join("/"):"—"}</span>
-        <span><b>Remuneración:</b> ${r.esJ?"Jornalero":"Mensual"}</span>
-        ${emp.horario?`<span class="full"><b>Horario:</b> ${emp.horario}</span>`:""}
-      </div>
+    <div class="secti">DATOS DEL EMPLEADO</div>
+    <table class="emptab">
+      <tr><td>Sector: Sin Definir</td><td>Banco:</td><td>Nº Contrato: ${emp.nroContrato||""}</td></tr>
+      <tr><td>Nombres: ${na.n.toUpperCase()}</td><td>Cargo: ${emp.cargo||""}</td><td>Fecha de Ingreso: ${fechaRecibo(emp.ingreso)}</td></tr>
+      <tr><td>Apellidos: ${na.a.toUpperCase()}</td><td>Remuneracion: ${r.esJ?"Jornalero":"Mensual"}</td><td>Fecha de Egreso:</td></tr>
+      <tr><td>C.I. ${emp.ci||""}</td><td colspan="2">Horario: ${emp.horario||""}</td></tr>
+    </table>
+    <table class="liqtab">
+      <tr><th colspan="3" class="ht">HABERES</th><th colspan="3" class="ht hb">DESCUENTOS</th></tr>
+      <tr class="sub"><td>Nombre</td><td>Detalle Liquidación</td><td class="c3">Importe</td><td class="hb">Nombre</td><td>Detalle Liquidación</td><td class="c3">Importe</td></tr>
+      ${(()=>{const H=hab.match(/<tr>.*?<\/tr>/g)||[],D=des.match(/<tr>.*?<\/tr>/g)||[];const n=Math.max(H.length,D.length);let out="";for(let i=0;i<n;i++){const h=H[i]?H[i].replace(/^<tr>|<\/tr>$/g,""):'<td></td><td></td><td></td>';const d=D[i]?D[i].replace(/^<tr>|<\/tr>$/g,"").replace('class="c1"','class="c1 hb"'):'<td class="hb"></td><td></td><td></td>';out+=`<tr>${h}${d}</tr>`;}return out;})()}
+    </table>
+    <div class="totrow">
+      <span>Total Gravado: $ ${fU(r.gravado)}</span>
+      <span>Total de Haberes: $ ${fU(r.gravado)}</span>
+      <span>Total de Descuentos: $ ${fU(r.totalDesc)}</span>
     </div>
-    <div class="cols">
-      <div><div class="col-t">HABERES</div><table><thead><tr><th>Descripción</th><th>Detalle</th><th class="num">Importe</th></tr></thead><tbody>${hab}</tbody></table></div>
-      <div><div class="col-t">DESCUENTOS</div><table><thead><tr><th>Descripción</th><th>Detalle</th><th class="num">Importe</th></tr></thead><tbody>${des}</tbody></table></div>
+    <div class="irpfblock">
+      <div>Tipo IRPF: adelanto de mes ${mesCorto}</div>
+      <div>Monto gravado para IRPF: ${fU(r.gravado)}</div>
+      <div>Monto computable para IRPF: ${fU(r.gravado)}</div>
+      <div>Monto deducciones para IRPF: ${fU(dedIRPF)}</div>
+      <div>Total neto: $ ${fU(r.neto)}</div>
+      <div>Redondeo: $ ${fU(r.redondeo)}</div>
     </div>
-    <div class="tots">
-      <div><span>Total Gravado BPS</span><b>$ ${fU(r.gravado)}</b></div>
-      <div><span>Total Descuentos</span><b>$ ${fU(r.totalDesc)}</b></div>
-      <div><span>Total Neto</span><b>$ ${fU(r.neto)}</b></div>
-      <div><span>Redondeo</span><b>$ ${fU(r.redondeo)}</b></div>
+    <div class="liqrow">
+      <div class="decl">La empresa declara haber efectuado los aportes de seguridad social y DGI correspondiente a los haberes<br/>del mes anterior según decreto 278/017.</div>
+      <div class="liqimp">Líquido a Cobrar : $ ${fU(r.liquido)}</div>
     </div>
-    <div class="liq">LÍQUIDO A COBRAR: <b>$ ${fU(r.liquido,0)}</b></div>
-    <div class="legal">La empresa declara haber efectuado los aportes de seguridad social y DGI correspondientes a los haberes del mes anterior según decreto 278/017.</div>
-    <div class="legal">Recibí el importe de Pesos Uruguayos ${numALetras(r.liquido)} y copia de esta liquidación, no teniendo nada que reclamar por ningún concepto. Recibo conforme al Art. 10, Ley 16.244 del 30/03/1992 y decretos reglamentarios. Conforme Res. 192 del MTSS de 11/2017, el Nº de transacción se encuentra consignado en el documento emitido por la institución de intermediación financiera a dichos efectos.</div>
-    <div class="firma"><div class="via">Vía: ${via}</div><div class="linea">Firma</div></div>
+    <div class="recibi">Recibí el importe de Pesos Uruguayos ${(t=>t.charAt(0).toUpperCase()+t.slice(1))(numALetras(r.liquido))}<br/>y copia de esta liquidación no teniendo nada que reclamar por ningún concepto</div>
+    <div class="firmarow">
+      <div class="firma">firma</div>
+      <div>Fecha de Pago:</div>
+      <div>Vía: ${via}</div>
+    </div>
+    <div class="conf">Conforme Res. 192 del MTSS de 11/2017, el Nº de transacción se encuentra consignado en el doc.<br/>emitido por la Institución de intermediación financiera a dichos efectos.</div>
   </div>`;
 }
 function imprimirRecibos(client,items,period,opts={}){
   const cuerpos=items.map(({emp,r})=>reciboHTML(client,emp,r,period,"Original Empresa")+reciboHTML(client,emp,r,period,"Copia Empleado")).join("");
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>Recibos ${client.name} ${period}</title><style>
-    *{box-sizing:border-box}body{font-family:Inter,'Segoe UI',Arial,sans-serif;margin:0;padding:18px;color:#0b1530;font-size:11px}
-    .recibo{border:1.2px solid #1f2c52;border-radius:8px;padding:14px 16px;margin-bottom:14px;page-break-inside:avoid}
+    *{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:14px;color:#000;font-size:10px}
+    .recibo{border:1px solid #000;padding:8px 10px;margin-bottom:12px;page-break-inside:avoid}
     .recibo:nth-child(even){page-break-after:always}
-    .head{border-bottom:2px solid #021942;padding-bottom:6px;margin-bottom:8px}
-    .emp-name{font-weight:800;font-size:14px;color:#021942;letter-spacing:.3px}
-    .head-grid{display:flex;gap:14px;flex-wrap:wrap;margin-top:3px;color:#33405e}
-    .periodo{margin-left:auto;font-weight:800;color:#2948D9;font-size:12px}
-    .datos{background:#f1f5fb;border-radius:6px;padding:7px 10px;margin-bottom:9px}
-    .dg{display:flex;gap:14px;flex-wrap:wrap;margin-top:2px;color:#33405e}.dg .full{width:100%}
-    .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .col-t{font-weight:800;font-size:10px;letter-spacing:1.5px;color:#021942;border-bottom:1px solid #c9d4ea;padding-bottom:3px;margin-bottom:4px}
-    table{width:100%;border-collapse:collapse}th{text-align:left;font-size:9px;color:#7a87a6;font-weight:600;padding:2px 4px}
-    td{padding:2.5px 4px;border-bottom:1px dotted #e2e8f4;font-size:10.5px}.det{color:#7a87a6;font-size:9.5px}.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-    .tots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
-    .tots>div{background:#f1f5fb;border-radius:6px;padding:5px 8px;display:flex;flex-direction:column}.tots span{font-size:8.5px;color:#7a87a6;letter-spacing:.5px}.tots b{font-size:11.5px;color:#021942}
-    .liq{margin-top:9px;background:#021942;color:#fff;border-radius:6px;padding:7px 12px;font-weight:700;font-size:12px;display:flex;justify-content:space-between}.liq b{font-size:14px;color:#8ECBDE}
-    .legal{margin-top:7px;font-size:8px;color:#7a87a6;line-height:1.45}
-    .firma{display:flex;justify-content:space-between;align-items:flex-end;margin-top:16px}
-    .via{font-size:9px;color:#33405e;font-weight:600}
-    .linea{border-top:1px solid #33405e;width:180px;text-align:center;font-size:9px;color:#33405e;padding-top:3px}
-    @media print{body{padding:0}.recibo{border-radius:0;margin-bottom:10px}}
+    .empnom{font-weight:bold;font-size:11.5px;text-transform:uppercase;margin-bottom:2px}
+    table{width:100%;border-collapse:collapse}
+    .toptab td{font-size:9.5px;padding:1px 2px;vertical-align:top}
+    .toptab .mes{text-align:right;font-weight:bold;font-size:10.5px}
+    .secti{font-weight:bold;font-size:9.5px;border-top:1px solid #000;border-bottom:1px solid #000;padding:2px;margin-top:4px;text-align:center;letter-spacing:.5px}
+    .emptab td{font-size:9.5px;padding:1.5px 2px;width:33.3%}
+    .liqtab{margin-top:4px;border-top:1px solid #000}
+    .liqtab .ht{font-weight:bold;font-size:9.5px;text-align:center;border-bottom:1px solid #000;padding:2px}
+    .liqtab .hb{border-left:1px solid #000}
+    .liqtab .sub td{font-size:8.5px;font-style:italic;border-bottom:1px solid #888;padding:1px 3px}
+    .liqtab td{font-size:9.5px;padding:1.5px 3px;vertical-align:top}
+    .liqtab .c2{color:#222;font-size:9px}
+    .liqtab .c3{text-align:right;white-space:nowrap}
+    .totrow{display:flex;justify-content:space-between;border-top:1px solid #000;margin-top:3px;padding:3px 2px;font-weight:bold;font-size:9.5px}
+    .irpfblock{margin-top:2px;font-size:9.5px;line-height:1.5;text-align:right;padding-right:2px}
+    .liqrow{display:flex;justify-content:space-between;align-items:flex-end;border-top:1px solid #000;margin-top:4px;padding-top:3px;gap:10px}
+    .decl{font-size:8.5px;line-height:1.35}
+    .liqimp{font-weight:bold;font-size:11px;white-space:nowrap}
+    .recibi{font-size:9px;margin-top:5px;line-height:1.4}
+    .firmarow{display:flex;justify-content:space-between;align-items:flex-end;margin-top:14px;font-size:9px}
+    .firma{border-top:1px solid #000;width:160px;text-align:center;padding-top:2px}
+    .conf{font-size:8px;margin-top:5px;line-height:1.35;color:#222}
+    @media print{body{padding:0}}
   </style></head><body>${cuerpos}<script>window.onload=function(){setTimeout(function(){window.print();},350);};</script></body></html>`;
   const w=window.open("","_blank","width=920,height=720");
   if(!w){alert("El navegador bloqueó la ventana de impresión. Permití ventanas emergentes para esta página.");return;}
@@ -1173,6 +1222,9 @@ function SueldosModule({client,upd,period,config}){
           <div><label style={lbl}>Fecha de ingreso</label><input type="date" value={emp.ingreso||""} onChange={e=>updEmp(emp.id,{ingreso:e.target.value})} style={{...inp,padding:"5px 7px",fontSize:12}}/></div>
           <div><label style={lbl}>Adic. SNIS (%)</label><select value={emp.snisAd??1.5} onChange={e=>updEmp(emp.id,{snisAd:+e.target.value})} style={{...inp,padding:"5px 7px",fontSize:12}}><option value={0}>0% (no aplica)</option><option value={1.5}>1,5% (sin hijos)</option><option value={3}>3% (con hijos a cargo)</option><option value={5}>5% (con cónyuge)</option></select></div>
           <div><label style={lbl}>Nocturnidad habitual</label><select value={emp.noct?"si":"no"} onChange={e=>updEmp(emp.id,{noct:e.target.value==="si"})} style={{...inp,padding:"5px 7px",fontSize:12}}><option value="no">No</option><option value="si">Sí (23%)</option></select></div>
+          <div><label style={lbl}>Nombres (recibo)</label><input value={emp.nombres||""} onChange={e=>updEmp(emp.id,{nombres:e.target.value})} style={{...inp,padding:"5px 7px",fontSize:12}} placeholder="María José"/></div>
+          <div><label style={lbl}>Apellidos (recibo)</label><input value={emp.apellidos||""} onChange={e=>updEmp(emp.id,{apellidos:e.target.value})} style={{...inp,padding:"5px 7px",fontSize:12}} placeholder="Pérez García"/></div>
+          <div><label style={lbl}>Nº Contrato BPS</label><input value={emp.nroContrato||""} onChange={e=>updEmp(emp.id,{nroContrato:e.target.value})} style={{...inp,padding:"5px 7px",fontSize:12}}/></div>
           <div style={{gridColumn:"1/-1"}}><label style={lbl}>Horario (sale en el recibo)</label><input value={emp.horario||""} onChange={e=>updEmp(emp.id,{horario:e.target.value})} style={{...inp,padding:"5px 7px",fontSize:12}}/></div>
         </div>}
         <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
@@ -1211,9 +1263,150 @@ function SueldosModule({client,upd,period,config}){
   </div>;
 }
 
+// ─── REPORTE PDF PARA CLIENTES (estética Laser Solutions) ─────────
+// Arma las líneas de obligaciones del mes según el régimen del cliente; los montos se pueden editar antes de generar
+function buildLineasEmpresa(c,period,config){
+  const t=c.taxes||{};const lines=[];
+  const dgiDue=`${String(config?.diaDGI||22).padStart(2,"0")}/${nextP(period)}`;
+  const bpsDue=`${String(config?.diaBPS||10).padStart(2,"0")}/${nextP(period)}`;
+  if(t.iva==="minimo")lines.push({org:"DGI",label:"IVA Mínimo (Literal E) — Form. 2908",due:dgiDue,amount:config?.ivaMinimo||null});
+  if(t.iva==="basica"||t.iva==="reducida")lines.push({org:"DGI",label:`IVA ${t.iva==="basica"?"tasa básica 22%":"tasa reducida 10%"} — DJ 2178`,due:dgiDue,amount:null});
+  if(t.iva==="sp")lines.push({org:"DGI",label:"IVA Servicios Personales — Form. 1302",due:dgiDue,amount:null});
+  if(t.iva==="monotributo")lines.push({org:"BPS",label:"Cuota Monotributo unificada",due:bpsDue,amount:null});
+  if(t.renta==="irae")lines.push({org:"DGI",label:`Anticipo IRAE${t.iraeEsFicto?" (régimen ficto)":""}`,due:dgiDue,amount:t.iraeMontoMensual||null});
+  if(t.renta==="irpf_cat2")lines.push({org:"DGI",label:"Anticipo IRPF Cat. II / FONASA serv. personales",due:dgiDue,amount:null});
+  if(t.patrimonio)lines.push({org:"DGI",label:"Anticipo Impuesto al Patrimonio",due:dgiDue,amount:t.ipAnticipoMensual||null});
+  if(c.hasEmployees&&(c.employees||[]).length){
+    const inc=(c.sueldos||{})[period]||{};
+    const opts={period,bpc:config?.bpc||6864,antigTope:c.antigTope!=null?c.antigTope:null};
+    const tot=(c.employees||[]).reduce((a,e)=>a+calcRecibo(e,inc[e.id]||{},opts).aportes,0);
+    lines.push({org:"BPS",label:`Aportes BPS nómina (${(c.employees||[]).length} empleado${(c.employees||[]).length!==1?"s":""}, según liquidación)`,due:bpsDue,amount:tot>0?Math.round(tot):null});
+  }
+  if(c.entityType==="sas"||c.entityType==="sa")lines.push({org:"BPS",label:"FONASA director/a titular",due:bpsDue,amount:null});
+  if(c.efactura==="activo")lines.push({org:"DGI",label:"Facturación electrónica: emisor activo — sin pago, control de CFE al día",due:"",amount:null});
+  if(c.efactura==="pendiente")lines.push({org:"DGI",label:"Facturación electrónica: ALTA PENDIENTE de gestionar",due:"",amount:null});
+  return lines;
+}
+function generarReportePDF(empresas,period,config,notaGeneral){
+  const tot=empresas.reduce((a,e)=>a+e.lines.reduce((x,l)=>x+(+l.amount||0),0),0);
+  const orgColor={DGI:"#B91C1C",BPS:"#1D4ED8",BSE:"#B45309",Otro:"#475569"};
+  const secciones=empresas.map(({client,lines,nota})=>{
+    const sub=lines.reduce((x,l)=>x+(+l.amount||0),0);
+    return`<div class="empresa">
+      <div class="emp-head"><div class="emp-nom">${client.name}</div><div class="emp-meta">${client.rut?`RUT ${client.rut}`:""}${client.numEmpresa?` · BPS ${client.numEmpresa}`:""}</div></div>
+      <table>
+        <thead><tr><th style="width:60px">Org.</th><th>Concepto</th><th style="width:90px">Vencimiento</th><th style="width:110px;text-align:right">Importe</th></tr></thead>
+        <tbody>${lines.map(l=>`<tr>
+          <td><span class="org" style="background:${(orgColor[l.org]||orgColor.Otro)}15;color:${orgColor[l.org]||orgColor.Otro};border-color:${(orgColor[l.org]||orgColor.Otro)}40">${l.org}</span></td>
+          <td>${l.label}</td><td>${l.due||"—"}</td>
+          <td class="num">${l.amount!=null&&l.amount!==""?"$ "+fU(+l.amount,2):"—"}</td></tr>`).join("")}
+        </tbody>
+        <tfoot><tr><td colspan="3">Subtotal ${client.name}</td><td class="num">$ ${fU(sub,2)}</td></tr></tfoot>
+      </table>
+      ${nota?`<div class="nota"><b>Nota:</b> ${nota}</div>`:""}
+    </div>`;
+  }).join("");
+  const html=`<!doctype html><html><head><meta charset="utf-8"><title>Reporte ${periodoLargo(period)}</title><style>
+    *{box-sizing:border-box}body{font-family:Inter,'Segoe UI',Arial,sans-serif;margin:0;padding:26px 30px;color:#0b1530;font-size:11.5px;background:#fff}
+    .head{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #021942;padding-bottom:14px;margin-bottom:6px}
+    .head img{width:185px}
+    .head .tit{text-align:right}
+    .head .t1{font-size:19px;font-weight:800;color:#021942}
+    .head .t2{font-size:12.5px;color:#2948D9;font-weight:700;margin-top:2px}
+    .intro{font-size:10.5px;color:#5B6B8C;margin:10px 0 16px}
+    .empresa{margin-bottom:20px;page-break-inside:avoid}
+    .emp-head{background:linear-gradient(100deg,#021942,#0A2B66);border-radius:8px 8px 0 0;padding:8px 13px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+    .emp-nom{color:#fff;font-weight:800;font-size:13.5px}
+    .emp-meta{color:#8ECBDE;font-size:10px;font-weight:600}
+    table{width:100%;border-collapse:collapse;border:1px solid #D8E2F2;border-top:none}
+    th{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#7a87a6;text-align:left;padding:6px 10px;background:#F1F5FB;border-bottom:1px solid #D8E2F2}
+    td{padding:6.5px 10px;border-bottom:1px solid #EDF1F9;vertical-align:middle}
+    .org{display:inline-block;border:1px solid;border-radius:99px;padding:1px 9px;font-size:9.5px;font-weight:800}
+    .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+    tfoot td{background:#F1F5FB;font-weight:800;color:#021942;border-top:2px solid #021942}
+    .nota{background:#FFFBEB;border:1px solid #FDE68A;border-radius:0 0 8px 8px;padding:7px 11px;font-size:10.5px;color:#78350F}
+    .grantotal{background:#021942;color:#fff;border-radius:10px;padding:13px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+    .grantotal .gt1{font-size:12px;font-weight:700;letter-spacing:.5px}
+    .grantotal .gt2{font-size:19px;font-weight:800;color:#8ECBDE}
+    .notagen{margin-top:14px;background:#F1F5FB;border-radius:8px;padding:10px 13px;font-size:11px;color:#33405e}
+    .foot{margin-top:26px;border-top:1px solid #D8E2F2;padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:9.5px;color:#7a87a6}
+    @media print{body{padding:12px 14px}}
+  </style></head><body>
+    <div class="head">
+      <img src="${LOGO_LASER_FULL}" alt="Laser Solutions"/>
+      <div class="tit"><div class="t1">Resumen de obligaciones</div><div class="t2">${periodoLargo(period)}</div></div>
+    </div>
+    <div class="intro">Detalle de obligaciones tributarias y de seguridad social del período, preparado por Laser Solutions.${empresas.length>1?` Incluye ${empresas.length} empresas del grupo.`:""}</div>
+    ${secciones}
+    <div class="grantotal"><div class="gt1">TOTAL A PREVER DEL PERÍODO${empresas.length>1?" (todas las empresas)":""}</div><div class="gt2">$ ${fU(tot,2)}</div></div>
+    ${notaGeneral?`<div class="notagen"><b>Notas:</b> ${notaGeneral}</div>`:""}
+    <div class="foot"><span>Laser Solutions · Gestión contable · ${config?.studioEmail||""}</span><span>Generado el ${TODAY.split("-").reverse().join("/")}</span></div>
+    <script>window.onload=function(){setTimeout(function(){window.print();},400);};</script>
+  </body></html>`;
+  const w=window.open("","_blank","width=940,height=760");
+  if(!w){alert("El navegador bloqueó la ventana. Permití ventanas emergentes para esta página.");return;}
+  w.document.write(html);w.document.close();w.focus();
+}
+function ReporteModal({clients,initialIds,period,config,onClose}){
+  const {m:rpM}=useR();
+  const [sel,setSel]=useState(()=>{
+    const o={};(initialIds||[]).forEach(id=>{const c=clients.find(x=>x.id===id);if(c)o[id]={lines:buildLineasEmpresa(c,period,config),nota:""};});
+    return o;
+  });
+  const [notaGeneral,setNotaGeneral]=useState("");
+  const toggle=(c)=>setSel(p=>{const n={...p};if(n[c.id])delete n[c.id];else n[c.id]={lines:buildLineasEmpresa(c,period,config),nota:""};return n;});
+  const updLine=(cid,i,patch)=>setSel(p=>({...p,[cid]:{...p[cid],lines:p[cid].lines.map((l,j)=>j===i?{...l,...patch}:l)}}));
+  const delLine=(cid,i)=>setSel(p=>({...p,[cid]:{...p[cid],lines:p[cid].lines.filter((_,j)=>j!==i)}}));
+  const addLine=(cid)=>setSel(p=>({...p,[cid]:{...p[cid],lines:[...p[cid].lines,{org:"DGI",label:"",due:"",amount:null}]}}));
+  const generar=()=>{
+    const empresas=Object.keys(sel).map(id=>({client:clients.find(c=>c.id===+id),lines:sel[id].lines.filter(l=>l.label),nota:sel[id].nota}));
+    if(!empresas.length)return;
+    generarReportePDF(empresas,period,config,notaGeneral);
+  };
+  return<div style={{position:"fixed",inset:0,background:"#021029a8",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:rpM?8:24}} onClick={onClose}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.white,borderRadius:14,width:760,maxWidth:"100%",maxHeight:"92vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 24px 80px #00081f80"}}>
+      <div style={{background:"linear-gradient(110deg,#021029,#021942 60%,#0A2B66)",padding:"13px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div>
+          <div style={{color:"#fff",fontWeight:800,fontSize:15,fontFamily:F}}>📄 Reporte para el cliente — {periodoLargo(period)}</div>
+          <div style={{color:"#8ECBDE",fontSize:11,fontFamily:F,marginTop:2}}>Elegí las empresas, ajustá montos y generá el PDF con la estética Laser Solutions.</div>
+        </div>
+        <button onClick={onClose} style={{background:"#ffffff14",border:"1px solid #ffffff25",color:"#8ECBDE",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:15}}>✕</button>
+      </div>
+      <div style={{padding:"12px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",gap:6,flexWrap:"wrap"}}>
+        {clients.filter(c=>c.status!=="inactivo").map(c=><button key={c.id} onClick={()=>toggle(c)} style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${sel[c.id]?C.blue:C.border}`,background:sel[c.id]?C.blue:"transparent",color:sel[c.id]?"#fff":C.gray,fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:F}}>{sel[c.id]?"✓ ":""}{c.name}</button>)}
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"12px 18px",display:"flex",flexDirection:"column",gap:14,background:C.bg}}>
+        {Object.keys(sel).length===0&&<div style={{textAlign:"center",color:C.gray,fontSize:12.5,fontFamily:F,padding:24}}>Seleccioná al menos una empresa arriba.</div>}
+        {Object.keys(sel).map(id=>{const c=clients.find(x=>x.id===+id);if(!c)return null;const s=sel[id];
+          return<div key={id} style={{background:C.white,borderRadius:10,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+            <div style={{background:C.navy,color:"#fff",padding:"7px 12px",fontWeight:700,fontSize:12.5,fontFamily:F}}>{c.name}</div>
+            <div style={{padding:"9px 12px"}}>
+              {s.lines.map((l,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:5,alignItems:"center",flexWrap:rpM?"wrap":"nowrap"}}>
+                <select value={l.org} onChange={e=>updLine(+id,i,{org:e.target.value})} style={{...inp,width:64,padding:"4px 5px",fontSize:11}}><option>DGI</option><option>BPS</option><option>BSE</option><option>Otro</option></select>
+                <input value={l.label} onChange={e=>updLine(+id,i,{label:e.target.value})} placeholder="Concepto" style={{...inp,flex:1,minWidth:140,padding:"4px 7px",fontSize:11.5}}/>
+                <input value={l.due} onChange={e=>updLine(+id,i,{due:e.target.value})} placeholder="dd/mm/aaaa" style={{...inp,width:88,padding:"4px 6px",fontSize:11}}/>
+                <input type="number" value={l.amount??""} onChange={e=>updLine(+id,i,{amount:e.target.value===""?null:+e.target.value})} placeholder="$" style={{...inp,width:96,padding:"4px 6px",fontSize:11.5,textAlign:"right"}}/>
+                <button onClick={()=>delLine(+id,i)} style={{background:C.red+"10",border:`1px solid ${C.red}30`,color:C.red,borderRadius:6,width:24,height:24,cursor:"pointer",fontSize:11,flexShrink:0}}>×</button>
+              </div>)}
+              <div style={{display:"flex",gap:8,marginTop:7,alignItems:"center"}}>
+                <button onClick={()=>addLine(+id)} style={{fontSize:11,color:C.blue,background:"transparent",border:`1px dashed ${C.blue}`,borderRadius:6,padding:"4px 11px",cursor:"pointer",fontFamily:F}}>+ Línea</button>
+                <input value={s.nota} onChange={e=>setSel(p=>({...p,[id]:{...p[id],nota:e.target.value}}))} placeholder="Nota para esta empresa (opcional)" style={{...inp,flex:1,padding:"4px 8px",fontSize:11.5}}/>
+              </div>
+            </div>
+          </div>;})}
+      </div>
+      <div style={{padding:"12px 18px",borderTop:`1px solid ${C.border}`,display:"flex",gap:9,alignItems:"center",background:C.white}}>
+        <input value={notaGeneral} onChange={e=>setNotaGeneral(e.target.value)} placeholder="Notas generales del reporte (opcional)" style={{...inp,flex:1}}/>
+        <button onClick={generar} disabled={Object.keys(sel).length===0} style={{background:Object.keys(sel).length?"linear-gradient(135deg,#2948D9,#1E37A8)":C.border,color:Object.keys(sel).length?"#fff":C.gray,border:"none",borderRadius:9,padding:"10px 20px",fontSize:13,fontWeight:800,cursor:Object.keys(sel).length?"pointer":"default",fontFamily:F,whiteSpace:"nowrap"}}>Generar PDF</button>
+      </div>
+    </div>
+  </div>;
+}
+
 // ─── CLIENT DETAIL ────────────────────────────────────────────────
 function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,config}){
   const [tab,setTab]=useState("resumen");
+  const [showReporte,setShowReporte]=useState(false);
   const [certPagoIdx,setCertPagoIdx]=useState(-1);
   const [certPagoMonto,setCertPagoMonto]=useState("");
   const [obState,setObState]=useState({});
@@ -1301,35 +1494,35 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
 
   const {m:cdM}=useR();
   return<div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-    <div style={{background:C.navy,padding:cdM?"10px 12px":"12px 20px"}}>
-      <button onClick={goBack} style={{color:"#8ECBDE",background:"transparent",border:"none",cursor:"pointer",fontSize:12,fontFamily:F,marginBottom:8,display:"block"}}>← Volver a Clientes</button>
-      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-        <Avatar name={client.name} taxes={client.taxes} size={42}/>
-        <div style={{flex:1}}>
-          <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <input value={client.name} onChange={e=>upd("name",e.target.value)} style={{background:"transparent",border:"none",borderBottom:`1px solid #ffffff40`,color:C.white,fontSize:17,fontWeight:700,fontFamily:F,padding:"2px 4px",outline:"none",minWidth:180}} onFocus={e=>e.target.style.borderBottomColor="#93C5FD"} onBlur={e=>e.target.style.borderBottomColor="#ffffff40"}/>
+    <div style={{background:ACTIVE_STUDIO==="laser"?"linear-gradient(110deg,#021029 0%,#021942 55%,#0A2B66 100%)":C.navy,padding:cdM?"9px 12px":"9px 18px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:11,flexWrap:"wrap"}}>
+        <button onClick={goBack} title="Volver a Clientes" style={{color:"#8ECBDE",background:"#ffffff12",border:"1px solid #ffffff20",borderRadius:8,cursor:"pointer",fontSize:15,fontFamily:F,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>←</button>
+        <Avatar name={client.name} taxes={client.taxes} size={36}/>
+        <div style={{flex:1,minWidth:210}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            <input value={client.name} onChange={e=>upd("name",e.target.value)} style={{background:"transparent",border:"none",borderBottom:`1px solid transparent`,color:C.white,fontSize:16,fontWeight:700,fontFamily:F,padding:"1px 2px",outline:"none",minWidth:170}} onFocus={e=>e.target.style.borderBottomColor="#93C5FD"} onBlur={e=>e.target.style.borderBottomColor="transparent"}/>
+            {client.specialTag&&<SpecialTag tag={client.specialTag} size={10}/>}
             {client.status==="inactivo"&&<Pill label="Inactivo" color={C.gray}/>}
           </div>
-          <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap",alignItems:"center"}}>
-            {client.specialTag&&<SpecialTag tag={client.specialTag} size={11}/>}
+          <div style={{display:"flex",gap:6,marginTop:2,flexWrap:"wrap",alignItems:"center"}}>
             <TBadge taxes={client.taxes}/>
             <Pill label={ENTITY[client.entityType]||client.entityType} color="#8ECBDE"/>
-            {client.hasEmployees&&<Pill label="Con empleados" color="#93C5FD"/>}
-            {client.rut&&<span style={{color:"#8ECBDE80",fontSize:11,fontFamily:F}}>RUT: {client.rut}</span>}
-            {client.numEmpresa&&<span style={{color:"#8ECBDE80",fontSize:11,fontFamily:F}}>Nº Emp: {client.numEmpresa}</span>}
+            {client.hasEmployees&&<Pill label={`${(client.employees||[]).length} empleado${(client.employees||[]).length!==1?"s":""}`} color="#93C5FD"/>}
+            {client.rut&&<span style={{color:"#8ECBDEa0",fontSize:10.5,fontFamily:F}}>RUT {client.rut}</span>}
+            {client.numEmpresa&&<span style={{color:"#8ECBDEa0",fontSize:10.5,fontFamily:F}}>BPS {client.numEmpresa}</span>}
+            {client.grupoMTSS&&<span style={{color:"#8ECBDEa0",fontSize:10.5,fontFamily:F}}>MTSS {client.grupoMTSS}</span>}
           </div>
         </div>
-        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5}}>
-          <PeriodNav period={period} setPeriod={setPeriod} inline/>
-          <div style={{display:"flex",gap:5}}>
-          <button onClick={()=>{const _wn=(client.whatsapp||"").replace(/\D/g,"");_wn.length>5&&openUrl(`https://wa.me/${_wn}`);}} style={{background:"#25D36618",color:"#25D366",border:"1px solid #25D36640",borderRadius:6,padding:"4px 8px",cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:4,fontSize:11}}>
-            <Logo src={LOGO_WA} size={33} style={{padding:1,borderRadius:3}}/>
+        <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
+          {ACTIVE_STUDIO==="laser"&&<button onClick={()=>setShowReporte(true)} style={{background:"#8ECBDE",color:"#021942",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontFamily:F,fontSize:11.5,fontWeight:700,marginRight:3}}>📄 Reporte</button>}
+          <button title="WhatsApp" onClick={()=>{const _wn=(client.whatsapp||"").replace(/\D/g,"");_wn.length>5&&openUrl(`https://wa.me/${_wn}`);}} style={{background:"#25D36618",border:"1px solid #25D36640",borderRadius:7,padding:"3px 6px",cursor:"pointer",display:"flex",alignItems:"center"}}>
+            <Logo src={LOGO_WA} size={22} style={{padding:1,borderRadius:3}}/>
           </button>
-          {[{logo:LOGO_DGI,url:"dgi"},{logo:LOGO_BPS,url:"bps"},{logo:LOGO_BSE,url:"bse"}].map(l=><button key={l.url} onClick={()=>openUrl(EXT[l.url])} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:6,padding:"4px 8px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><LogoRaw src={l.logo} size={33}/></button>)}
-          </div>
+          {[{logo:LOGO_DGI,url:"dgi"},{logo:LOGO_BPS,url:"bps"},{logo:LOGO_BSE,url:"bse"}].map(l=><button key={l.url} onClick={()=>openUrl(EXT[l.url])} style={{background:C.white,border:`1px solid ${C.border}`,borderRadius:7,padding:"3px 6px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><LogoRaw src={l.logo} size={22}/></button>)}
         </div>
       </div>
     </div>
+    {showReporte&&<ReporteModal clients={clients} initialIds={[client.id]} period={period} config={config} onClose={()=>setShowReporte(false)}/>}
 
     <div style={{background:C.white,borderBottom:`1px solid ${C.border}`,display:"flex",overflowX:"auto"}}>
       {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"9px 15px",border:"none",borderBottom:`2px solid ${tab===t.id?C.blue:"transparent"}`,background:"transparent",color:tab===t.id?C.blue:C.gray,fontWeight:tab===t.id?600:400,fontSize:13,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>{t.l}</button>)}
@@ -2000,8 +2193,13 @@ function ConfigPanel({config,setConfig}){
         <div><label style={lbl}>Día vencimiento DGI</label><input type="number" min="1" max="31" value={config.diaDGI||22} onChange={e=>set("diaDGI",+e.target.value)} style={inp}/></div>
         <div><label style={lbl}>Día vencimiento BPS</label><input type="number" min="1" max="31" value={config.diaBPS||10} onChange={e=>set("diaBPS",+e.target.value)} style={inp}/></div>
       </FormSection>
-      <FormSection title="Valores de referencia fiscal 2025">
+      <FormSection title="Valores de referencia fiscal">
         {[["bpc","BPC (pesos)"],["ui","UI (pesos)"],["iraeMinimoMensual","Anticipo IRAE mínimo mensual ($)"],["ivaMinimo","IVA Mínimo Lit. E mensual ($)"],["monotributoA","Monotributo Categoría A ($)"],["monotributoB","Monotributo Categoría B ($)"],["icosaAnual","ICOSA – Anticipo anual S.A. ($)"]].map(([k,l])=><div key={k}><label style={lbl}>{l}</label><input type="number" step="0.01" value={config[k]||0} onChange={e=>set(k,+e.target.value)} style={inp}/></div>)}
+        <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",background:C.bg,borderRadius:8,padding:"9px 12px"}}>
+          <div style={{fontSize:11,color:C.gray,fontFamily:F,flex:1,minWidth:220}}>Vigentes 2026: BPC <b>$6.864</b> · SMN <b>$24.572</b> (desde 1/7: $25.383) · IVA Mínimo <b>$5.910</b> · IRAE mínimo <b>$6.840</b>. La UI ajusta a diario — verificala en el BCU.</div>
+          <button onClick={()=>openUrl("https://www.bcu.gub.uy/Estadisticas-e-Indicadores/Paginas/Cotizaciones.aspx")} style={{background:C.blue,color:"#fff",border:"none",borderRadius:7,padding:"7px 13px",fontSize:11.5,fontWeight:700,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>🔗 Cotizaciones BCU</button>
+          <button onClick={()=>openUrl("https://www.gub.uy/instituto-nacional-estadistica/comunicacion/publicaciones?field_tipo_de_publicacion_target_id=621&field_fecha_de_publicacion_value%5Bvalue%5D%5Byear%5D=")} style={{background:"transparent",color:C.blue,border:`1px solid ${C.blue}50`,borderRadius:7,padding:"7px 13px",fontSize:11.5,fontWeight:700,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>UI diaria (INE)</button>
+        </div>
       </FormSection>
       <FormSection title="Parámetros fiscales adicionales">
         {[["icosaMensual","ICOSA mensual S.A. ($)"],["salarioMinimo","Salario mínimo nominal ($)"]].map(([k,l])=><div key={k}><label style={lbl}>{l}</label><input type="number" value={config[k]||0} onChange={e=>set(k,+e.target.value)} style={inp}/></div>)}
@@ -2172,7 +2370,22 @@ export default function Obligo(){
   const handleLogin=(u,st="vc")=>{
     applyStudio(st);
     setStudio(st);
-    if(st==="laser"){setClients(loadList('ls_clients',CLIENTS_LASER));setConfig(loadObj('ls_config',LASER_CONFIG_DEFAULT));}
+    if(st==="laser"){
+      let lsC=loadList('ls_clients',CLIENTS_LASER);
+      let lsCfg=loadObj('ls_config',LASER_CONFIG_DEFAULT);
+      // Migración de datos precargados: al subir la versión del seed se actualizan los 7 clientes base
+      // (datos DGI/MTSS nuevos) preservando lo trabajado: sueldos, trámites, nóminas, tareas y credenciales
+      let seedOk=false;try{seedOk=localStorage.getItem('ls_seed')===LASER_SEED_V;}catch(e){}
+      if(!seedOk){
+        const byId={};lsC.forEach(c=>{byId[c.id]=c;});
+        lsC=CLIENTS_LASER.map(seed=>{const old=byId[seed.id];if(!old)return seed;
+          return{...seed,sueldos:old.sueldos||{},tramites:old.tramites||[],nominas:old.nominas||{},billing:old.billing||{},facturas:old.facturas||{},boletos:old.boletos||{},incidencias:old.incidencias||[],certsDGI:old.certsDGI||[],credentials:old.credentials||seed.credentials,studyFee:old.studyFee,studyFeePaid:old.studyFeePaid,notes:seed.notes};
+        }).concat(lsC.filter(c=>!CLIENTS_LASER.some(s=>s.id===c.id)));
+        lsCfg={...lsCfg,bpc:LASER_CONFIG_DEFAULT.bpc,ui:LASER_CONFIG_DEFAULT.ui,salarioMinimo:LASER_CONFIG_DEFAULT.salarioMinimo,ivaMinimo:LASER_CONFIG_DEFAULT.ivaMinimo,iraeMinimoMensual:LASER_CONFIG_DEFAULT.iraeMinimoMensual};
+        try{localStorage.setItem('ls_seed',LASER_SEED_V);localStorage.setItem('ls_clients',JSON.stringify(lsC));localStorage.setItem('ls_config',JSON.stringify(lsCfg));}catch(e){}
+      }
+      setClients(lsC);setConfig(lsCfg);
+    }
     else{setClients(loadList('gc_clients',CLIENTS_INIT));setConfig(loadObj('gc_config',CONFIG_DEFAULT));}
     setView("dashboard");setClientId(null);
     setAuthUser(u);
