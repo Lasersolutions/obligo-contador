@@ -31,6 +31,17 @@ const LOGO_VC="data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns='http://
 const C_VC={...C,gold:VC_GOLD};
 const C_LASER={...C,navy:"#021942",blue:"#2948D9",dark:"#021029",bg:"#F1F5FB",border:"#D8E2F2",cell1:"#EAF3FA",cell2:"#D8EAF5",accent:"#8ECBDE"};
 let ACTIVE_STUDIO="vc";
+// Cada estudio puede tener su propio subdominio: el host define a qué estudio pertenece la puerta.
+//   obligo-laser.lasersolutions.com.uy      -> sólo usuarios de Laser Solutions
+//   obligo-vcestudio.lasersolutions.com.uy  -> sólo usuarios del Estudio Valeria Calvette
+// En cualquier otro host (vercel.app, localhost) siguen entrando ambos, como hasta ahora.
+function hostStudio(){
+  if(typeof window==="undefined")return null;
+  const h=(window.location.hostname||"").toLowerCase();
+  if(h.includes("obligo-laser")||h.includes("laser-obligo"))return "laser";
+  if(h.includes("vcestudio")||h.includes("obligo-vc"))return "vc";
+  return null;
+}
 function applyStudio(id){ACTIVE_STUDIO=id;Object.assign(C,id==="laser"?C_LASER:C_VC);}
 const TODAY=new Date().toISOString().split('T')[0];
 // La app abre siempre en el mes en curso (dp está declarada más abajo: las funciones se elevan)
@@ -493,12 +504,18 @@ function PieChart({slices,size=110}){
 // ─── LOGIN ────────────────────────────────────────────────────────
 function LoginScreen({onLogin}){
   const [user,setUser]=useState("");const[pass,setPass]=useState("");const[show,setShow]=useState(false);const[err,setErr]=useState("");
-  const isLaser=typeof window!=="undefined"&&window.location.hash.toLowerCase().includes("laser");
+  const host=hostStudio();
+  const isLaser=host==="laser"||(host===null&&typeof window!=="undefined"&&window.location.hash.toLowerCase().includes("laser"));
   const login=()=>{
-    const f=USERS.find(u=>u.id===user.trim()&&u.pass===pass);
-    if(f){onLogin(f,"vc");return;}
-    const l=USERS_LASER.find(u=>u.id===user.trim().toLowerCase()&&u.pass===pass);
-    if(l){onLogin(l,"laser");return;}
+    // En cada subdominio sólo entran los usuarios de ese estudio
+    if(host!=="laser"){
+      const f=USERS.find(u=>u.id===user.trim()&&u.pass===pass);
+      if(f){onLogin(f,"vc");return;}
+    }
+    if(host!=="vc"){
+      const l=USERS_LASER.find(u=>u.id===user.trim().toLowerCase()&&u.pass===pass);
+      if(l){onLogin(l,"laser");return;}
+    }
     setErr("Usuario o contraseña incorrectos.");
   };
   if(isLaser)return<div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"linear-gradient(160deg,#021029 0%,#021942 55%,#0A2B66 100%)",fontFamily:F,padding:16,boxSizing:"border-box"}}>
