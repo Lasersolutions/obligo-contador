@@ -33,7 +33,8 @@ const C_LASER={...C,navy:"#021942",blue:"#2948D9",dark:"#021029",bg:"#F1F5FB",bo
 let ACTIVE_STUDIO="vc";
 function applyStudio(id){ACTIVE_STUDIO=id;Object.assign(C,id==="laser"?C_LASER:C_VC);}
 const TODAY=new Date().toISOString().split('T')[0];
-const PINIT="04/2026";
+// La app abre siempre en el mes en curso (dp está declarada más abajo: las funciones se elevan)
+const PINIT=dp(new Date());
 
 function pd(p){const[m,y]=p.split("/");return new Date(+y,+m-1,1);}
 function dp(d){return`${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;}
@@ -77,6 +78,40 @@ function taxTags(taxes){
   return t;
 }
 function isConf(c){const t=c.taxes;return t&&(t.renta!=="ninguno"||t.iva!=="no_aplica"||t.patrimonio);}
+
+// ─── FILTRO POR IMPUESTO ──────────────────────────────────────────
+const TAX_FILTERS=[
+  ["all","Todos los impuestos"],
+  ["irae","Renta: IRAE"],["irae_ficto","Renta: IRAE ficto"],["irpf_cat1","Renta: IRPF Cat. I"],["irpf_cat2","Renta: IRPF Cat. II"],
+  ["iva_basica","IVA 22%"],["iva_reducida","IVA 10%"],["iva_minimo","IVA Mínimo (Lit. E)"],["iva_sp","IVA Serv. Personales"],["monotributo","Monotributo"],["iva_no","Sin IVA"],
+  ["patrimonio","Impuesto al Patrimonio"],
+  ["empleados","Con empleados (BPS)"],["efact_pend","e-Factura pendiente"],
+  ["sin_config","Sin configurar"],["especial","Etiqueta especial"],
+];
+// Accesos rápidos: los filtros que un contador usa todos los meses
+const TAX_QUICK=[["irae","IRAE","#021942"],["irpf_cat2","IRPF II","#4F46E5"],["iva_basica","IVA 22%","#1D4ED8"],["iva_minimo","IVA Mínimo","#D97706"],["iva_sp","IVA SP","#0891B2"],["patrimonio","Patrimonio","#DC2626"],["empleados","Con empleados","#059669"],["sin_config","Sin configurar","#6B7280"]];
+function matchTaxFilter(c,f){
+  if(!f||f==="all")return true;
+  const t=c.taxes||{};
+  switch(f){
+    case "irae":return t.renta==="irae";
+    case "irae_ficto":return t.renta==="irae"&&!!t.iraeEsFicto;
+    case "irpf_cat1":return t.renta==="irpf_cat1";
+    case "irpf_cat2":return t.renta==="irpf_cat2";
+    case "iva_basica":return t.iva==="basica";
+    case "iva_reducida":return t.iva==="reducida";
+    case "iva_minimo":return t.iva==="minimo";
+    case "iva_sp":return t.iva==="sp";
+    case "monotributo":return t.iva==="monotributo";
+    case "iva_no":return !t.iva||t.iva==="no_aplica";
+    case "patrimonio":return !!t.patrimonio;
+    case "empleados":return !!c.hasEmployees&&(c.employees||[]).length>0;
+    case "efact_pend":return c.efactura==="pendiente";
+    case "sin_config":return !isConf(c);
+    case "especial":return !!c.specialTag;
+    default:return true;
+  }
+}
 
 // ─── RULES ENGINE ─────────────────────────────────────────────────
 function getObs(client,period=""){const _pm=parseInt((period||"").split("/")[0]||"0");
@@ -231,7 +266,22 @@ const CLIENTS_INIT=[
 
 // ─── CLIENTES LASER SOLUTIONS ─────────────────────────────────────
 // Empleado extendido para liquidación de sueldos (módulo Sueldos)
-const mkEmpL=(o={})=>mkEmp({ingreso:"",horario:"",snisAd:1.5,noct:false,nombres:"",apellidos:"",nroContrato:"",...o});
+const mkEmpL=(o={})=>mkEmp({ingreso:"",horario:"",snisAd:1.5,noct:false,nombres:"",apellidos:"",nroContrato:"",sueldoAnterior:null,jornalAnterior:null,sueldoVigencia:"",ultimoAjuste:null,...o});
+// Datos guardados en el navegador de versiones anteriores pueden no tener todos los campos.
+// Se normalizan al cargar para que ninguna pantalla se rompa por una lista o un objeto faltante.
+const normClient=(c)=>({
+  ...c,
+  status:c.status||"activo",
+  taxes:{...mkTax(),...(c.taxes||{})},
+  tasks:(Array.isArray(c.tasks)?c.tasks:[]).map(t=>({...t,due:t.due||"",done:!!t.done})),
+  employees:Array.isArray(c.employees)?c.employees:[],
+  tramites:Array.isArray(c.tramites)?c.tramites:[],
+  certsDGI:Array.isArray(c.certsDGI)?c.certsDGI:[],
+  incidencias:Array.isArray(c.incidencias)?c.incidencias:[],
+  specialTaxes:Array.isArray(c.specialTaxes)?c.specialTaxes:[],
+  nominas:c.nominas||{},sueldos:c.sueldos||{},billing:c.billing||{},facturas:c.facturas||{},boletos:c.boletos||{},
+  credentials:c.credentials||mkCred(),
+});
 const CLIENTS_LASER=[
   mk(101,"Gabriela Martínez SAS","sas","servicios",{...mkTax("irae","basica",true),iraeEsFicto:true},{
     giro:"Residenciales de adultos mayores (Palermo y Blanes) — 87300",rut:"219035810010",numEmpresa:"7.755.330",
@@ -240,19 +290,19 @@ const CLIENTS_LASER=[
     hasEmployees:true,domicilio:"Av. Gral. Rivera 2287, Montevideo",
     notes:"SAS con acciones nominativas. Inscripción DGI 14/10/2021 · RNC 16591 (18/10/2021). Obligaciones DGI: IRAE + IVA general + Patrimonio (desde 14/10/2021). Emisor electrónico desde 13/12/2024. Cierre de balance 31/12. Sucursal: Juan Manuel Blanes 965 (local 3, desde 14/01/2025). Domicilio constituido: Serrato 3647/102. Representante legal: Gabriela Verónica Martínez Rodríguez (RUT 212334200012). FONASA obligatorio para la directora + declaración anual de beneficiario final ante BCU (Ley 19.484).",
     employees:[
-      mkEmpL({id:1,name:"Alicia Ivonne Rodríguez Seguessa",nombres:"Alicia Ivonne",apellidos:"Rodríguez Seguessa",ci:"4.631.030-8",cargo:"Cuidadora",sueldo:33959.20,ingreso:"2024-10-15",horario:"8hs flex - Desc. 1 día c/5 trab.",snisAd:3}),
-      mkEmpL({id:2,name:"Natalia Salomé Videla Platukis",nombres:"Natalia Salomé",apellidos:"Videla Platukis",ci:"4.840.373-7",cargo:"Cuidadora",sueldo:33958.66,ingreso:"2022-09-22",horario:"Mar a Dom de 14 a 22hs (flexible)",snisAd:3}),
-      mkEmpL({id:3,name:"Fátima Yanina Ceppi González",nombres:"Fátima Yanina",apellidos:"Ceppi González",ci:"5.203.613-0",cargo:"Cuidadora",sueldo:32987.28,ingreso:"2024-04-24",horario:"8hs flexible - Desc. 1 día c/5 trab.",snisAd:1.5}),
-      mkEmpL({id:4,name:"Lourdes Catherine Rodríguez",nombres:"Lourdes Catherine",apellidos:"Rodríguez",ci:"4.365.170-5",cargo:"Cuidadora",sueldo:29681.28,ingreso:"2024-03-08",horario:"22 a 06hs - Desc. 1 día c/5 trab.",snisAd:3,noct:true}),
-      mkEmpL({id:5,name:"Eneida Marina Rojas",nombres:"Eneida Marina",apellidos:"Rojas",ci:"6.592.259-4",cargo:"Cuidadora",sueldo:29674,ingreso:"2025-02-01",horario:"8 horas, libra los jueves",snisAd:3,noct:true}),
-      mkEmpL({id:6,name:"Dianela Torres Garrido",nombres:"Dianela",apellidos:"Torres Garrido",ci:"6.691.678-6",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-02-06",horario:"Rotativo, 8hs, 5 días y descansa 1",snisAd:1.5}),
-      mkEmpL({id:7,name:"Carmen Katherine González Rosario",nombres:"Carmen Katherine",apellidos:"González Rosario",ci:"6.408.726-4",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-05-08",horario:"15 a 22hs, desc. 1 día c/5 trab.",snisAd:1.5}),
-      mkEmpL({id:8,name:"María Tamay Camacho Arrieta",nombres:"María Tamay",apellidos:"Camacho Arrieta",ci:"6.408.674-3",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-05-08",horario:"De 14 a 22hs, rotativo",snisAd:1.5}),
-      mkEmpL({id:9,name:"Valeria Vázquez Sánchez",nombres:"Valeria",apellidos:"Vázquez Sánchez",ci:"4.503.642-0",cargo:"Cuidadora",sueldo:33326.33,ingreso:"2025-06-01",horario:"Desc. 1 día c/5, a demanda de sucursal",snisAd:1.5}),
-      mkEmpL({id:10,name:"Katherine Fiorella González González",nombres:"Katherine Fiorella",apellidos:"González González",ci:"5.219.070-0",cargo:"Cuidadora",sueldo:32214.42,ingreso:"2025-08-05",horario:"5 días semanales y 1 de descanso",snisAd:1.5}),
-      mkEmpL({id:11,name:"María Fernanda Fernández Basso",nombres:"María Fernanda",apellidos:"Fernández Basso",ci:"5.027.965-3",cargo:"Cuidadora",sueldo:34139.31,ingreso:"2024-06-03",horario:"14 a 22hs - 1 día libre c/5 trab.",snisAd:3}),
-      mkEmpL({id:12,name:"Patricia Mariana Grajales Cancela",nombres:"Patricia Mariana",apellidos:"Grajales Cancela",ci:"3.047.159-6",cargo:"Cuidadora",sueldo:32826.70,ingreso:"2025-10-12",horario:"De miércoles a lunes",snisAd:3}),
-      mkEmpL({id:13,name:"María Ruth Peñaloza Soria",nombres:"María Ruth",apellidos:"Peñaloza Soria",ci:"5.411.933-4",cargo:"Cuidadora",sueldo:31686,ingreso:"2026-03-23",horario:"14 a 22hs, 5 días y descansa 1",snisAd:3}),
+      mkEmpL({id:1,name:"Alicia Ivonne Rodríguez Seguessa",nombres:"Alicia Ivonne",apellidos:"Rodríguez Seguessa",ci:"4.631.030-8",cargo:"Cuidadora",sueldo:34910.06,sueldoAnterior:33959.2,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:33959.2},ingreso:"2024-10-15",horario:"8hs flex - Desc. 1 día c/5 trab.",snisAd:3}),
+      mkEmpL({id:2,name:"Natalia Salomé Videla Platukis",nombres:"Natalia Salomé",apellidos:"Videla Platukis",ci:"4.840.373-7",cargo:"Cuidadora",sueldo:34909.5,sueldoAnterior:33958.66,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:33958.66},ingreso:"2022-09-22",horario:"Mar a Dom de 14 a 22hs (flexible)",snisAd:3}),
+      mkEmpL({id:3,name:"Fátima Yanina Ceppi González",nombres:"Fátima Yanina",apellidos:"Ceppi González",ci:"5.203.613-0",cargo:"Cuidadora",sueldo:33910.92,sueldoAnterior:32987.28,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:32987.28},ingreso:"2024-04-24",horario:"8hs flexible - Desc. 1 día c/5 trab.",snisAd:1.5}),
+      mkEmpL({id:4,name:"Lourdes Catherine Rodríguez",nombres:"Lourdes Catherine",apellidos:"Rodríguez",ci:"4.365.170-5",cargo:"Cuidadora",sueldo:30512.36,sueldoAnterior:29681.28,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:29681.28},ingreso:"2024-03-08",horario:"22 a 06hs - Desc. 1 día c/5 trab.",snisAd:3,noct:true}),
+      mkEmpL({id:5,name:"Eneida Marina Rojas",nombres:"Eneida Marina",apellidos:"Rojas",ci:"6.592.259-4",cargo:"Cuidadora",sueldo:30504.87,sueldoAnterior:29674,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:29674},ingreso:"2025-02-01",horario:"8 horas, libra los jueves",snisAd:3,noct:true}),
+      mkEmpL({id:6,name:"Dianela Torres Garrido",nombres:"Dianela",apellidos:"Torres Garrido",ci:"6.691.678-6",cargo:"Cuidadora",sueldo:34259.47,sueldoAnterior:33326.33,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:33326.33},ingreso:"2025-02-06",horario:"Rotativo, 8hs, 5 días y descansa 1",snisAd:1.5}),
+      mkEmpL({id:7,name:"Carmen Katherine González Rosario",nombres:"Carmen Katherine",apellidos:"González Rosario",ci:"6.408.726-4",cargo:"Cuidadora",sueldo:34259.47,sueldoAnterior:33326.33,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:33326.33},ingreso:"2025-05-08",horario:"15 a 22hs, desc. 1 día c/5 trab.",snisAd:1.5}),
+      mkEmpL({id:8,name:"María Tamay Camacho Arrieta",nombres:"María Tamay",apellidos:"Camacho Arrieta",ci:"6.408.674-3",cargo:"Cuidadora",sueldo:34259.47,sueldoAnterior:33326.33,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:33326.33},ingreso:"2025-05-08",horario:"De 14 a 22hs, rotativo",snisAd:1.5}),
+      mkEmpL({id:9,name:"Valeria Vázquez Sánchez",nombres:"Valeria",apellidos:"Vázquez Sánchez",ci:"4.503.642-0",cargo:"Cuidadora",sueldo:34259.47,sueldoAnterior:33326.33,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:33326.33},ingreso:"2025-06-01",horario:"Desc. 1 día c/5, a demanda de sucursal",snisAd:1.5}),
+      mkEmpL({id:10,name:"Katherine Fiorella González González",nombres:"Katherine Fiorella",apellidos:"González González",ci:"5.219.070-0",cargo:"Cuidadora",sueldo:33116.42,sueldoAnterior:32214.42,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:32214.42},ingreso:"2025-08-05",horario:"5 días semanales y 1 de descanso",snisAd:1.5}),
+      mkEmpL({id:11,name:"María Fernanda Fernández Basso",nombres:"María Fernanda",apellidos:"Fernández Basso",ci:"5.027.965-3",cargo:"Cuidadora",sueldo:35095.21,sueldoAnterior:34139.31,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:34139.31},ingreso:"2024-06-03",horario:"14 a 22hs - 1 día libre c/5 trab.",snisAd:3}),
+      mkEmpL({id:12,name:"Patricia Mariana Grajales Cancela",nombres:"Patricia Mariana",apellidos:"Grajales Cancela",ci:"3.047.159-6",cargo:"Cuidadora",sueldo:33745.85,sueldoAnterior:32826.7,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:32826.7},ingreso:"2025-10-12",horario:"De miércoles a lunes",snisAd:3}),
+      mkEmpL({id:13,name:"María Ruth Peñaloza Soria",nombres:"María Ruth",apellidos:"Peñaloza Soria",ci:"5.411.933-4",cargo:"Cuidadora",sueldo:32573.21,sueldoAnterior:31686,sueldoVigencia:"07/2026",ultimoAjuste:{fecha:"1 de julio de 2026",pct:2.8,anterior:31686},ingreso:"2026-03-23",horario:"14 a 22hs, 5 días y descansa 1",snisAd:3}),
     ]}),
   mk(102,"Gabriela Martínez Unipersonal","unipersonal","industria_comercio",mkTax("ninguno","minimo"),{
     giro:"Fábrica de pastas frescas — Bel Mangiare",rut:"212334200012",numEmpresa:"1.886.112",
@@ -292,7 +342,7 @@ const CLIENTS_LASER=[
 // Valores vigentes 2026: BPC $6.864 (Dec. 11/026) · SMN $24.572 (Dec. 319/025; desde 1/7/2026: $25.383)
 // IVA Mínimo $5.910 e IRAE mínimo $6.840 (Dec. 310/025) · UI al 12/06/2026: $6,5720 (ajusta a diario, ver BCU/INE)
 const LASER_CONFIG_DEFAULT={studioName:"Laser Solutions",studioCode:"LaserSolutions",studioRut:"",studioEmail:"sales@lasersolutions.com",studioPhone:"",adminPass:"laser2026",secretariaPass:"ayud123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000};
-const LASER_SEED_V="4";
+const LASER_SEED_V="5";
 
 // ─── ETIQUETAS ESPECIALES (Solo Web / Solo Marketing / Convenio pendiente) ───
 const SPECIAL_TAG_COLOR={"Solo Web":"#2948D9","Solo Marketing":"#8E44AD","Convenio pendiente":"#D97706"};
@@ -912,19 +962,34 @@ function AlertsCenter({clients}){
 function ClientList({clients,openClient,onNew}){
   const {m:clM}=useR();
   const [search,setSearch]=useState("");const[showModal,setShowModal]=useState(false);const[sf,setSf]=useState("activo");
-  const filtered=useMemo(()=>clients.filter(c=>(sf==="all"||c.status===sf)&&(c.name.toLowerCase().includes(search.toLowerCase())||(c.giro||"").toLowerCase().includes(search.toLowerCase()))),[clients,search,sf]);
+  const [tf,setTf]=useState("all");
+  const filtered=useMemo(()=>clients.filter(c=>{
+    if(sf!=="all"&&c.status!==sf)return false;
+    const q=search.toLowerCase();
+    if(q&&!(c.name.toLowerCase().includes(q)||(c.giro||"").toLowerCase().includes(q)||(c.rut||"").includes(q)||(c.numEmpresa||"").includes(q)))return false;
+    return matchTaxFilter(c,tf);
+  }),[clients,search,sf,tf]);
+  const conteo=useMemo(()=>{const o={};TAX_FILTERS.forEach(([k])=>{o[k]=clients.filter(c=>(sf==="all"||c.status===sf)&&matchTaxFilter(c,k)).length;});return o;},[clients,sf]);
   return<div style={{padding:clM?12:22}}>
     {showModal&&<NewClientModal onClose={()=>setShowModal(false)} onSave={onNew}/>}
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
       <h1 style={{margin:0,fontSize:19,fontWeight:700,color:C.navy,fontFamily:F}}>Clientes <span style={{fontSize:13,color:C.gray,fontWeight:400}}>({clients.length})</span></h1>
       <button onClick={()=>setShowModal(true)} style={{background:C.blue,color:C.white,border:"none",borderRadius:6,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F}}>+ Nuevo cliente</button>
     </div>
-    <div style={{display:"flex",gap:8,marginBottom:12}}>
-      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar..." style={{...inp,flex:1,maxWidth:320}}/>
+    <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nombre, giro, RUT o Nº BPS..." style={{...inp,flex:1,minWidth:200,maxWidth:340}}/>
       <select value={sf} onChange={e=>setSf(e.target.value)} style={{...inp,width:"auto"}}>
         <option value="activo">Activos</option><option value="inactivo">Inactivos</option><option value="all">Todos</option>
       </select>
+      <select value={tf} onChange={e=>setTf(e.target.value)} style={{...inp,width:"auto",fontWeight:tf!=="all"?700:400,color:tf!=="all"?C.blue:C.navy}}>
+        {TAX_FILTERS.map(([k,l])=><option key={k} value={k}>{l} ({conteo[k]||0})</option>)}
+      </select>
+      {tf!=="all"&&<button onClick={()=>setTf("all")} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:7,padding:"0 12px",fontSize:12,cursor:"pointer",fontFamily:F,color:C.gray}}>Limpiar filtro ✕</button>}
     </div>
+    <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+      {TAX_QUICK.map(([k,l,col])=>{const n=conteo[k]||0;const on=tf===k;return<button key={k} onClick={()=>setTf(on?"all":k)} disabled={n===0&&!on} style={{padding:"4px 11px",borderRadius:99,border:`1.5px solid ${on?col:col+"40"}`,background:on?col:col+"0f",color:on?"#fff":n===0?C.gray:col,fontSize:11.5,fontWeight:700,cursor:n===0&&!on?"default":"pointer",fontFamily:F,opacity:n===0&&!on?.45:1}}>{l} · {n}</button>;})}
+    </div>
+    <div style={{fontSize:12,color:C.gray,fontFamily:F,marginBottom:8}}>Mostrando <b style={{color:C.navy}}>{filtered.length}</b> de {clients.length} clientes{tf!=="all"?` · filtro: ${(TAX_FILTERS.find(f=>f[0]===tf)||[])[1]}`:""}</div>
     <div style={{background:C.white,borderRadius:8,boxShadow:"0 1px 3px #0001",overflow:"hidden"}}>
       <div style={{overflowX:"auto"}}>
       <div style={{display:"grid",gridTemplateColumns:"2.5fr 1fr 1fr 1fr 80px",background:C.navy,padding:"8px 14px",minWidth:520}}>
@@ -1018,6 +1083,46 @@ function EmpBlock({client,upd,addingEmp,setAddingEmp,newEmp,setNewEmp,addEmpF}){
 //  gravado BPS = básico + antigüedad + nocturnidad − faltas   (jornalero: jornal × jornales)
 //  aportes: Jubilatorio 15% · FRL 0,1% · Seguro Enf. 3% · Adic. SNIS según empleado (0 si gravado < 2,5 BPC)
 const fU=(n,d=2)=>new Intl.NumberFormat("es-UY",{minimumFractionDigits:d,maximumFractionDigits:d}).format(n||0);
+const pKey=(p)=>{const[m,y]=(p||"").split("/");return(+y||0)*100+(+m||0);};
+
+// ─── CONSEJOS DE SALARIOS (actas MTSS) ────────────────────────────
+// Los ajustes se aplican desde el módulo de Sueldos y quedan con fecha de vigencia:
+// los meses ya liquidados no se modifican.
+const CONVENIOS={
+  "15.4":{
+    nombre:"Grupo 15 · Subgrupo 4 — Casas de Salud y Residenciales de Ancianos (con fines de lucro)",
+    exp:"Expediente 2025-13-2-0003506 · acta del 7/11/2025 · vigencia 1/7/2025 a 30/6/2028",
+    franjas:[["I","Hasta $35.704"],["II","$35.705 a $151.459"],["III","Desde $151.460"]],
+    franjaNota:"Franja según el salario nominal vigente al 30/6/2025 (44 hs semanales). Casi todos los sueldos del sector caen en Nivel I.",
+    ajustes:[
+      {fecha:"1 de julio de 2025",vig:"07/2025",pct:{I:3.3,II:2.5,III:1.6},minimo:28643},
+      {fecha:"1 de enero de 2026",vig:"01/2026",pct:{I:3.6,II:3.3,III:2.9},minimo:29674},
+      {fecha:"1 de julio de 2026",vig:"07/2026",pct:{I:2.8,II:1.9,III:1.7}},
+      {fecha:"1 de enero de 2027",vig:"01/2027",pct:{I:3.5,II:3.2,III:2.7}},
+      {fecha:"1 de julio de 2027",vig:"07/2027",pct:{I:2.8,II:1.9,III:1.7}},
+      {fecha:"1 de enero de 2028",vig:"01/2028",pct:{I:3.5,II:3.2,III:2.7}},
+    ],
+    notas:["Categorías del acta: Cocinero, Limpiador, Cuidador y Cuidador Nochero.","Al Cuidador Nochero se le adiciona 23% por nocturnidad sobre el mínimo.","Correctivos: sólo se aplican en más y sólo a las franjas I y II."],
+  },
+  "1/12.2":{
+    nombre:"Grupo 1 · Subgrupo 12 · Capítulo 2 — Fábricas de Pastas",
+    exp:"Expediente 2025-13-2-0002292 · actas del 23 y 24/7/2025",
+    franjas:[["U","Único (aumento lineal)"]],
+    franjaNota:"El acta fija un aumento lineal igual para todos los salarios del sector.",
+    ajustes:[
+      {fecha:"1 de julio de 2025",vig:"07/2025",pct:{U:2.5}},
+      {fecha:"1 de noviembre de 2025",vig:"11/2025",pct:{U:2}},
+      {fecha:"1 de enero de 2026",vig:"01/2026",pct:{U:0.75}},
+      {fecha:"1 de marzo de 2026",vig:"03/2026",pct:{U:2.5}},
+    ],
+    notas:["Tope para percibir la prima por antigüedad (al 1/7/2025): salario base mensual igual o superior a $72.852.","Valor ficto de la pasta mensual a entregar a cada trabajador (1/7/2025): $481.","El correctivo inflacionario del período 7/2024–6/2025 resultó negativo, por lo que no se aplicó."],
+  },
+};
+function convenioDe(client){
+  const g=(client.grupoMTSS||"").trim();
+  if(CONVENIOS[g])return{key:g,...CONVENIOS[g]};
+  return null;
+}
 function calcRecibo(emp,inc={},opts={}){
   const period=opts.period||PINIT;
   const [pm,py]=period.split("/");
@@ -1028,7 +1133,12 @@ function calcRecibo(emp,inc={},opts={}){
   if(opts.antigTope!=null)antPct=Math.min(antPct,opts.antigTope);
   const esJ=emp.tipo==="jornalero";
   const jornales=esJ?(+inc.jornales||0):0;
-  const base=esJ?(emp.jornal||0)*jornales:(emp.sueldo||0);
+  // Si el sueldo fue aumentado por convenio con vigencia futura, los meses anteriores
+  // siguen liquidando con el sueldo viejo (no se altera lo ya liquidado)
+  const previo=emp.sueldoVigencia&&pKey(period)<pKey(emp.sueldoVigencia);
+  const sueldoAct=previo&&emp.sueldoAnterior!=null?emp.sueldoAnterior:(emp.sueldo||0);
+  const jornalAct=previo&&emp.jornalAnterior!=null?emp.jornalAnterior:(emp.jornal||0);
+  const base=esJ?jornalAct*jornales:sueldoAct;
   const antig=esJ?0:base*antPct;
   const noctOn=inc.noct!=null?!!inc.noct:!!emp.noct;
   const noct=noctOn&&!esJ?(base+antig)*0.23:0;
@@ -1045,7 +1155,7 @@ function calcRecibo(emp,inc={},opts={}){
   const totalDesc=aportes+irpf+adel+prest;
   const neto=gravado-totalDesc;
   const liquido=Math.max(0,Math.round(neto));
-  return{esJ,jornales,base,years,antPct,antig,noct,noctOn,faltasD,faltas,gravado,jub,frl,segEnf,snis,snisPct,aportes,irpf,adel,prest,totalDesc,neto,liquido,redondeo:liquido-neto};
+  return{esJ,jornales,base,sueldoAct,jornalAct,years,antPct,antig,noct,noctOn,faltasD,faltas,gravado,jub,frl,segEnf,snis,snisPct,aportes,irpf,adel,prest,totalDesc,neto,liquido,redondeo:liquido-neto};
 }
 const MESES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Setiembre","Octubre","Noviembre","Diciembre"];
 function periodoLargo(p){const[m,y]=p.split("/");return`${MESES[+m-1]} ${y}`;}
@@ -1175,9 +1285,101 @@ function imprimirRecibos(client,items,period,opts={}){
   if(!w){alert("El navegador bloqueó la ventana de impresión. Permití ventanas emergentes para esta página.");return;}
   w.document.write(html);w.document.close();w.focus();
 }
+// ─── AUMENTO POR CONSEJO DE SALARIOS ──────────────────────────────
+function AumentoModal({client,onClose,onApply}){
+  const {m:auM}=useR();
+  const conv=convenioDe(client);
+  // Por defecto, el último ajuste que ya entró en vigencia (el que hay que aplicar hoy)
+  const [ajIdx,setAjIdx]=useState(()=>{
+    if(!conv)return 0;
+    const hoy=pKey(dp(new Date()));
+    let i=-1;conv.ajustes.forEach((a,k)=>{if(pKey(a.vig)<=hoy)i=k;});
+    return i>=0?i:0;
+  });
+  const [manual,setManual]=useState(!conv);
+  const [pctManual,setPctManual]=useState("");
+  const [vigManual,setVigManual]=useState(nextP(dp(new Date())));
+  const [franjas,setFranjas]=useState({});
+  const aj=conv?conv.ajustes[ajIdx]:null;
+  const nivelesConv=conv?Object.keys(conv.franjas.reduce((o,[k])=>({...o,[k]:1}),{})):[];
+  const nivelDe=(emp)=>franjas[emp.id]||nivelesConv[0]||"I";
+  const pctDe=(emp)=>manual?(+pctManual||0):(aj?aj.pct[nivelDe(emp)]||0:0);
+  const vig=manual?vigManual:(aj?aj.vig:"");
+  const round2=(n)=>Math.round(n*100)/100;
+  const filas=(client.employees||[]).map(e=>{
+    const esJ=e.tipo==="jornalero";
+    const actual=esJ?(e.jornal||0):(e.sueldo||0);
+    const p=pctDe(e);
+    return{e,esJ,actual,pct:p,nuevo:round2(actual*(1+p/100)),dif:round2(actual*(p/100))};
+  });
+  const yaAplicado=(client.employees||[]).some(e=>e.sueldoVigencia===vig);
+  const aplicar=()=>{
+    const emps=client.employees.map(e=>{
+      const f=filas.find(x=>x.e.id===e.id);
+      if(!f||!f.actual||!f.pct)return e;
+      return f.esJ
+        ?{...e,jornalAnterior:e.jornal,jornal:f.nuevo,sueldoVigencia:vig,ultimoAjuste:{fecha:aj?aj.fecha:`vigencia ${vig}`,pct:f.pct,anterior:f.actual}}
+        :{...e,sueldoAnterior:e.sueldo,sueldo:f.nuevo,sueldoVigencia:vig,ultimoAjuste:{fecha:aj?aj.fecha:`vigencia ${vig}`,pct:f.pct,anterior:f.actual}};
+    });
+    onApply(emps);onClose();
+  };
+  return<div onClick={onClose} style={{position:"fixed",inset:0,background:"#0b152e8c",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:auM?10:22}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.white,borderRadius:14,width:720,maxWidth:"100%",maxHeight:"92vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 20px 60px #00002050",fontFamily:F}}>
+      <div style={{background:C.navy,padding:"13px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{color:"#fff",fontWeight:800,fontSize:15}}>📈 Aumento por Consejo de Salarios</div>
+          <div style={{color:"#8ECBDE",fontSize:11,marginTop:2}}>{conv?conv.nombre:"Sin convenio precargado para este grupo — usá el porcentaje manual."}</div>
+        </div>
+        <button onClick={onClose} style={{background:"#ffffff14",border:"1px solid #ffffff25",color:"#8ECBDE",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:15}}>✕</button>
+      </div>
+      <div style={{padding:"12px 18px",overflowY:"auto",background:C.bg,flex:1}}>
+        {conv&&<div style={{background:C.white,borderRadius:9,padding:"10px 13px",border:`1px solid ${C.border}`,marginBottom:11}}>
+          <div style={{fontSize:10.5,color:C.gray,marginBottom:7}}>{conv.exp}</div>
+          <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center"}}>
+            <label style={{...lbl,margin:0}}>Ajuste:</label>
+            <select value={manual?"manual":ajIdx} onChange={e=>{if(e.target.value==="manual")setManual(true);else{setManual(false);setAjIdx(+e.target.value);}}} style={{...inp,width:"auto",padding:"5px 8px",fontSize:12}}>
+              {conv.ajustes.map((a,i)=><option key={i} value={i}>{a.fecha} — {Object.entries(a.pct).map(([k,v])=>`${nivelesConv.length>1?"Niv."+k+" ":""}${String(v).replace(".",",")}%`).join(" · ")}</option>)}
+              <option value="manual">Otro porcentaje (manual)</option>
+            </select>
+            {aj&&aj.minimo&&<span style={{fontSize:11,color:C.gray}}>Mínimo del sector: <b style={{color:C.navy}}>$ {fU(aj.minimo,0)}</b></span>}
+          </div>
+          {conv.franjaNota&&nivelesConv.length>1&&<div style={{fontSize:10.5,color:C.gray,marginTop:7,lineHeight:1.45}}>{conv.franjaNota} — franjas: {conv.franjas.map(([k,v])=>`Nivel ${k}: ${v}`).join(" · ")}</div>}
+        </div>}
+        {manual&&<div style={{background:C.white,borderRadius:9,padding:"10px 13px",border:`1px solid ${C.border}`,marginBottom:11,display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
+          <div><label style={lbl}>Porcentaje de aumento (%)</label><input type="number" step="0.01" value={pctManual} onChange={e=>setPctManual(e.target.value)} placeholder="2,8" style={{...inp,width:110,padding:"6px 8px",fontSize:12.5}}/></div>
+          <div><label style={lbl}>Rige desde (MM/AAAA)</label><input value={vigManual} onChange={e=>setVigManual(e.target.value)} placeholder="07/2026" style={{...inp,width:110,padding:"6px 8px",fontSize:12.5}}/></div>
+        </div>}
+        <div style={{background:"#EFF6FF",border:`1px solid ${C.blue}33`,borderRadius:9,padding:"8px 12px",fontSize:11.5,color:C.navy,marginBottom:11,lineHeight:1.5}}>
+          El aumento rige desde <b>{vig||"—"}</b>. Los recibos de meses anteriores se siguen liquidando con el sueldo viejo, así que no se altera nada de lo ya cerrado.
+          {yaAplicado&&<div style={{color:C.warn,fontWeight:700,marginTop:4}}>⚠ Ya hay empleados con un ajuste vigente desde {vig}. Si lo aplicás de nuevo, el aumento se suma otra vez.</div>}
+        </div>
+        <div style={{background:C.white,borderRadius:9,border:`1px solid ${C.border}`,overflow:"hidden"}}>
+          <div style={{display:"grid",gridTemplateColumns:auM?"1.6fr .8fr .8fr":`2fr ${nivelesConv.length>1?"90px ":""}1fr 1fr 1fr`,background:C.navy,padding:"7px 11px",gap:6}}>
+            {["Empleado",...(nivelesConv.length>1&&!auM?["Franja"]:[]),"Actual","%","Nuevo"].map(h=><div key={h} style={{color:"#EFF0F4",fontSize:10,fontWeight:700,letterSpacing:.3}}>{h}</div>)}
+          </div>
+          {filas.map(f=><div key={f.e.id} style={{display:"grid",gridTemplateColumns:auM?"1.6fr .8fr .8fr":`2fr ${nivelesConv.length>1?"90px ":""}1fr 1fr 1fr`,padding:"7px 11px",gap:6,alignItems:"center",borderBottom:`1px solid ${C.border}60`}}>
+            <div style={{fontSize:12,color:C.navy,fontWeight:600,overflow:"hidden",textOverflow:"ellipsis"}}>{f.e.name}<div style={{fontSize:10,color:C.gray,fontWeight:400}}>{f.esJ?"Jornalero":"Mensual"}</div></div>
+            {nivelesConv.length>1&&!auM&&<select value={nivelDe(f.e)} onChange={e=>setFranjas(p=>({...p,[f.e.id]:e.target.value}))} disabled={manual} style={{...inp,padding:"3px 5px",fontSize:11}}>{nivelesConv.map(n=><option key={n} value={n}>Nivel {n}</option>)}</select>}
+            {!auM&&<div style={{fontSize:12,color:C.gray,fontVariantNumeric:"tabular-nums"}}>$ {fU(f.actual)}</div>}
+            <div style={{fontSize:12,color:C.blue,fontWeight:700}}>{String(f.pct).replace(".",",")}%</div>
+            <div style={{fontSize:12.5,color:C.ok,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>$ {fU(f.nuevo)}<div style={{fontSize:10,color:C.gray,fontWeight:400}}>+{fU(f.dif)}</div></div>
+          </div>)}
+          {filas.length===0&&<div style={{padding:20,textAlign:"center",color:C.gray,fontSize:12.5}}>Sin empleados cargados.</div>}
+        </div>
+        {conv&&conv.notas&&<ul style={{fontSize:10.5,color:C.gray,lineHeight:1.6,margin:"11px 0 0",paddingLeft:17}}>{conv.notas.map((n,i)=><li key={i}>{n}</li>)}</ul>}
+      </div>
+      <div style={{padding:"12px 18px",borderTop:`1px solid ${C.border}`,display:"flex",gap:9,justifyContent:"flex-end",alignItems:"center"}}>
+        <button onClick={onClose} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 16px",fontSize:13,cursor:"pointer",fontFamily:F,color:C.gray}}>Cancelar</button>
+        <button onClick={aplicar} disabled={!filas.some(f=>f.pct>0)} style={{background:filas.some(f=>f.pct>0)?C.ok:C.border,color:filas.some(f=>f.pct>0)?"#fff":C.gray,border:"none",borderRadius:8,padding:"9px 20px",fontSize:13,fontWeight:700,cursor:filas.some(f=>f.pct>0)?"pointer":"default",fontFamily:F}}>Aplicar aumento desde {vig||"—"}</button>
+      </div>
+    </div>
+  </div>;
+}
+
 function SueldosModule({client,upd,period,config}){
   const {m:suM}=useR();
   const [fichaId,setFichaId]=useState(null);
+  const [showAum,setShowAum]=useState(false);
   const sueldos=client.sueldos||{};
   const incMes=sueldos[period]||{};
   const setInc=(empId,patch)=>{
@@ -1195,8 +1397,14 @@ function SueldosModule({client,upd,period,config}){
         <div style={{color:C.white,fontWeight:700,fontSize:15,fontFamily:F}}>Liquidación de sueldos — {periodoLargo(period)}</div>
         <div style={{color:"#8ECBDE",fontSize:11,fontFamily:F,marginTop:2}}>Cargá faltas e incidencias del mes; el recibo se calcula solo, igual que la planilla.</div>
       </div>
+      <button onClick={()=>setShowAum(true)} style={{background:"#ffffff1a",color:"#fff",border:"1px solid #ffffff33",borderRadius:8,padding:"9px 14px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>📈 Aumento por convenio</button>
       <button onClick={()=>imprimirRecibos(client,filas.filter(f=>f.r.gravado>0),period)} style={{background:"#8ECBDE",color:"#021942",border:"none",borderRadius:8,padding:"9px 16px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>🖨 Imprimir todos los recibos</button>
     </div>
+    {showAum&&<AumentoModal client={client} onClose={()=>setShowAum(false)} onApply={(emps)=>upd("employees",emps)}/>}
+    {(client.employees||[]).some(e=>e.sueldoVigencia&&pKey(period)<pKey(e.sueldoVigencia))&&
+      <div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:9,padding:"9px 13px",fontSize:12,color:"#78350F",fontFamily:F}}>
+        Hay un aumento de convenio cargado con vigencia posterior a {periodoLargo(period)}. Este mes se liquida con los sueldos anteriores; el nuevo importe entra automáticamente desde su mes de vigencia.
+      </div>}
     {client.employees.length===0&&<div style={{background:C.white,borderRadius:8,padding:24,textAlign:"center",color:C.gray,fontFamily:F,fontSize:13}}>Este cliente no tiene empleados cargados. Agregalos desde la pestaña Datos.</div>}
     {filas.map(({emp,inc,r})=>{
       const editing=fichaId===emp.id;
@@ -1205,7 +1413,9 @@ function SueldosModule({client,upd,period,config}){
           <Avatar name={emp.name} taxes={client.taxes} size={32}/>
           <div style={{flex:1,minWidth:170}}>
             <div style={{fontWeight:700,fontSize:13.5,color:C.navy,fontFamily:F}}>{emp.name}</div>
-            <div style={{fontSize:11,color:C.gray,fontFamily:F}}>{emp.cargo||"–"} · CI {emp.ci||"–"} · {r.esJ?`Jornal $${fU(emp.jornal)}`:`Básico $${fU(emp.sueldo)}`}{!r.esJ&&r.antPct>0?` · Antig. ${Math.round(r.antPct*100)}%`:""}</div>
+            <div style={{fontSize:11,color:C.gray,fontFamily:F}}>{emp.cargo||"–"} · CI {emp.ci||"–"} · {r.esJ?`Jornal $${fU(r.jornalAct)}`:`Básico $${fU(r.sueldoAct)}`}{!r.esJ&&r.antPct>0?` · Antig. ${Math.round(r.antPct*100)}%`:""}
+              {emp.ultimoAjuste&&emp.sueldoVigencia&&<span style={{color:pKey(period)>=pKey(emp.sueldoVigencia)?C.ok:C.warn,fontWeight:600}}> · {pKey(period)>=pKey(emp.sueldoVigencia)?"↑":"⏳"} {String(emp.ultimoAjuste.pct).replace(".",",")}% desde {emp.sueldoVigencia}</span>}
+            </div>
           </div>
           <button onClick={()=>setFichaId(editing?null:emp.id)} style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:`1px solid ${C.blue}40`,background:editing?C.blue:C.blue+"10",color:editing?C.white:C.blue,cursor:"pointer",fontFamily:F,fontWeight:600}}>{editing?"Cerrar ficha":"Ficha"}</button>
           <button onClick={()=>imprimirRecibos(client,[{emp,r}],period)} disabled={r.gravado<=0} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"none",background:r.gravado>0?C.navy:C.border,color:r.gravado>0?"#8ECBDE":C.gray,cursor:r.gravado>0?"pointer":"default",fontFamily:F,fontWeight:700}}>🧾 Recibo PDF</button>
@@ -2343,7 +2553,7 @@ export default function Obligo(){
   const [view,setView]=useState("dashboard");
   const [clientId,setClientId]=useState(null);
   const [clients,setClients]=useState(()=>{
-    try{const s=localStorage.getItem('gc_clients');if(s){const d=JSON.parse(s);if(d&&d.length)return d;}}catch(e){}
+    try{const s=localStorage.getItem('gc_clients');if(s){const d=JSON.parse(s);if(d&&d.length)return d.map(normClient);}}catch(e){}
     return CLIENTS_INIT;
   });
   useEffect(()=>{if(!authUser)return;try{localStorage.setItem(studio==="laser"?'ls_clients':'gc_clients',JSON.stringify(clients));}catch(e){};},[clients,studio,authUser]);
@@ -2358,7 +2568,7 @@ export default function Obligo(){
   useEffect(()=>{if(!authUser)return;try{localStorage.setItem(studio==="laser"?'ls_config':'gc_config',JSON.stringify(config));}catch(e){}},[config,studio,authUser]);
 
   // Cada estudio carga y guarda sus propios datos; los de Valeria Calvette (gc_*) no se tocan desde Laser (ls_*)
-  const loadList=(key,fallback)=>{try{const s=localStorage.getItem(key);if(s){const d=JSON.parse(s);if(d&&d.length)return d;}}catch(e){}return fallback;};
+  const loadList=(key,fallback)=>{try{const s=localStorage.getItem(key);if(s){const d=JSON.parse(s);if(d&&d.length)return d.map(normClient);}}catch(e){}return fallback;};
   const loadObj=(key,fallback)=>{try{const s=localStorage.getItem(key);if(s)return{...fallback,...JSON.parse(s)};}catch(e){}return fallback;};
   const handleLogin=(u,st="vc")=>{
     applyStudio(st);
