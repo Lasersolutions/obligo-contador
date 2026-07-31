@@ -2615,6 +2615,12 @@ export default function Obligo(){
     setClients(loadList('gc_clients',CLIENTS_INIT));setConfig(loadObj('gc_config',CONFIG_DEFAULT));
   };
 
+  // El título de la pestaña acompaña al estudio (cada subdominio tiene su identidad)
+  useEffect(()=>{
+    const st=hostStudio()||studio;
+    document.title=st==="laser"?"Laser Solutions · Gestión contable":"Estudio Valeria Calvette · Obligo";
+  },[studio]);
+
   const client=useMemo(()=>clients.find(c=>c.id===clientId),[clients,clientId]);
   const openClient=(id)=>{setClientId(id);setView("client");};
   const goBack=()=>{setView("clients");setClientId(null);};
