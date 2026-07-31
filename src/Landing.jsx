@@ -1,34 +1,19 @@
 // ─── LANDING OFICIAL DE OBLIGO ─────────────────────────────────────
 // Vive en https://obligo.lasersolutions.com.uy (la "puerta general").
-// No es la app: es la página de producto. Muestra qué partes tiene
-// Obligo, imágenes clave de cada una, y desde acá se entra a los
-// estudios, que viven cada uno en su propio subdominio.
+// No es la app: es la página de producto. Muestra qué es Obligo y qué
+// partes tiene.
 //
-// Para verla en local: http://localhost:5173/?landing
+// Privacidad: la landing NO enlaza a los estudios ni dice cuáles son.
+// Cada estudio entra por su propio subdominio, que sólo conoce quien
+// trabaja ahí. Las capturas de /public/shots son de un estudio vacío:
+// no se ve ningún dato de ningún cliente.
+//
+// Para verla en local: http://localhost:3001/?landing
 // Para saltearla y ver la app en ese mismo host: /?app
 import { useEffect } from "react";
 
-const ACCESOS = [
-  {
-    id: "vc",
-    estudio: "Estudio Valeria Calvette",
-    bajada: "Estudio impositivo y contable",
-    url: "https://obligo-vcestudio.lasersolutions.com.uy",
-    color: "#14294F",
-    accent: "#C8A44D",
-  },
-  {
-    id: "laser",
-    estudio: "Laser Solutions",
-    bajada: "Gestión contable",
-    url: "https://obligo-laser.lasersolutions.com.uy",
-    color: "#021942",
-    accent: "#8ECBDE",
-  },
-];
+const LOGO = "/obligo-iso.png";
 
-// Cada estudio entra por su propio subdominio: un usuario de un estudio
-// no puede entrar por la puerta del otro.
 export function isLandingHost() {
   if (typeof window === "undefined") return false;
   const sp = new URLSearchParams(window.location.search);
@@ -144,35 +129,31 @@ const MODULOS = [
   },
 ];
 
-// Las imágenes viven en /public/shots. Si todavía no está capturada,
-// el marco muestra el detalle en texto y la página no se rompe.
-// El Panel Principal ya se ve en el hero, así que el recorrido arranca
-// en Clientes y sigue el orden en que se trabaja el mes.
+// Las imágenes viven en /public/shots. Están sacadas de un estudio
+// vacío a propósito: los datos de los clientes de cada estudio son
+// privados y no se muestran acá. Si una captura falta, el marco
+// muestra el nombre de la pantalla y la página no se rompe.
+// El Panel Principal ya se ve en el hero.
 const IMAGENES = [
+  {
+    src: "/shots/nuevo.png",
+    t: "Alta de un cliente",
+    d: "Se elige el tipo de entidad y el régimen de renta e IVA. Con eso alcanza: las obligaciones de cada mes se generan solas, no se cargan a mano.",
+  },
   {
     src: "/shots/clientes.png",
     t: "Lista de clientes",
-    d: "Los clientes del estudio con su régimen, filtrables por impuesto y con el estado del mes a la vista.",
-  },
-  {
-    src: "/shots/ficha.png",
-    t: "Obligaciones del mes",
-    d: "Cada cliente con lo que le toca ese período, generado por el motor de reglas. Dos marcas independientes: pagado y notificado.",
-  },
-  {
-    src: "/shots/tributario.png",
-    t: "Cálculo del mes y Boleto 2908",
-    d: "Se carga la facturación y el resto se calcula solo: IVA, IRAE, Patrimonio y el total a pagar a DGI, con el desglose del boleto.",
-  },
-  {
-    src: "/shots/sueldos.png",
-    t: "Liquidación de sueldos",
-    d: "Antigüedad, nocturnidad, faltas, aportes y líquido de cada empleado. El recibo PDF sale con el formato oficial.",
+    d: "Cada cliente con su régimen, sus impuestos y sus tareas pendientes. Los chips de arriba filtran por impuesto y llevan el contador.",
   },
   {
     src: "/shots/calendario.png",
     t: "Calendario de vencimientos",
-    d: "El mes con los vencimientos reales de DGI y BPS de todos los clientes del estudio.",
+    d: "El mes con los vencimientos de DGI y BPS de todo el estudio. Lo del mes se paga al mes siguiente, y el calendario lo muestra así.",
+  },
+  {
+    src: "/shots/config.png",
+    t: "Valores del año, ya cargados",
+    d: "BPC, UI, Salario Mínimo Nacional, IVA mínimo, IRAE mínimo y monotributo vienen puestos y actualizados. No hay que buscarlos.",
   },
 ];
 
@@ -181,6 +162,31 @@ const PASOS = [
   { n: "2", t: "Obligo arma el mes", d: "Calcula los anticipos, genera las obligaciones que corresponden y consolida el Boleto 2908." },
   { n: "3", t: "Se paga y se marca", d: "Cada obligación tiene dos marcas independientes: Pagado y Notificado." },
   { n: "4", t: "Se le avisa al cliente", d: "Mensaje de WhatsApp con el importe del mes o reporte PDF, desde el mismo sistema." },
+];
+
+// Obligo no se entrega vacío: arranca con la normativa puesta y con
+// los datos del estudio ya cargados.
+const PRECARGA = [
+  {
+    ic: "📚",
+    t: "La normativa uruguaya",
+    d: "Las reglas de cada régimen fiscal ya están escritas adentro: qué obligación le toca a cada tipo de contribuyente, ante qué organismo y con qué vencimiento.",
+  },
+  {
+    ic: "🔢",
+    t: "Los valores del año",
+    d: "BPC, UI, Salario Mínimo Nacional, IVA mínimo, IRAE mínimo, monotributo y los días de vencimiento de DGI y BPS vienen cargados y actualizados.",
+  },
+  {
+    ic: "📈",
+    t: "Los convenios de salarios",
+    d: "Los Consejos de Salarios que le sirven al estudio vienen con sus porcentajes, sus fechas de vigencia, sus topes y sus fictos.",
+  },
+  {
+    ic: "📥",
+    t: "Y la carga inicial del estudio",
+    d: "Antes de empezar a usarlo, cargamos los clientes del estudio con su régimen, sus datos de DGI, BPS, MTSS y BSE y sus empleados. El primer día ya está todo adentro.",
+  },
 ];
 
 const REGLAS = [
@@ -205,7 +211,7 @@ export default function Landing() {
       let l = document.querySelector("link[rel~='icon']");
       if (!l) { l = document.createElement("link"); l.rel = "icon"; document.head.appendChild(l); }
       l.type = "image/png";
-      l.href = "/icon-192.png";
+      l.href = LOGO;
     } catch (e) {}
   }, []);
 
@@ -216,16 +222,15 @@ export default function Landing() {
       {/* ── Barra superior ── */}
       <header className="lp-top">
         <a className="lp-brand" href="#top">
-          <img src="/icon-192.png" alt="" />
+          <img src={LOGO} alt="" />
           <span>Obligo<b>.</b></span>
         </a>
         <nav className="lp-nav">
           <a href="#modulos">Módulos</a>
+          <a href="#precarga">Precarga</a>
           <a href="#imagenes">Pantallas</a>
           <a href="#como">Cómo funciona</a>
-          <a href="#accesos">Accesos</a>
         </nav>
-        <a className="lp-btn lp-btn-sm" href="#accesos">Ingresar</a>
       </header>
 
       {/* ── Hero ── */}
@@ -237,10 +242,11 @@ export default function Landing() {
             Obligo arma solo las obligaciones de cada cliente, calcula lo que hay
             que pagar cada mes, liquida los sueldos y avisa antes de que algo se
             venza. Pensado para la normativa uruguaya: DGI, BPS, MTSS y BSE.
+            Y no arranca vacío: se entrega con la información ya cargada.
           </p>
           <div className="lp-cta">
-            <a className="lp-btn" href="#accesos">Entrar a mi estudio</a>
-            <a className="lp-btn lp-btn-ghost" href="#modulos">Ver qué tiene</a>
+            <a className="lp-btn" href="#modulos">Ver qué tiene</a>
+            <a className="lp-btn lp-btn-ghost" href="#como">Cómo funciona</a>
           </div>
           <Shot src="/shots/panel.png" alt="Panel Principal de Obligo" big />
         </div>
@@ -281,14 +287,38 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── Precarga ── */}
+      <section className="lp-sec lp-sec-alt" id="precarga">
+        <div className="lp-wrap">
+          <Titulo
+            kicker="Precarga"
+            h="Obligo no se entrega vacío"
+            s="Llega con la normativa puesta y con la información del estudio ya cargada. El primer día se empieza a trabajar, no a cargar datos."
+          />
+          <div className="lp-pre">
+            {PRECARGA.map((p) => (
+              <div className="lp-pre-card" key={p.t}>
+                <div className="lp-mod-ic">{p.ic}</div>
+                <h3>{p.t}</h3>
+                <p>{p.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Imágenes clave ── */}
-      <section className="lp-sec lp-sec-alt" id="imagenes">
+      <section className="lp-sec" id="imagenes">
         <div className="lp-wrap">
           <Titulo
             kicker="Pantallas"
             h="Cómo se ve Obligo por dentro"
             s="Las pantallas donde pasa el trabajo del mes."
           />
+          <p className="lp-privacidad">
+            Las pantallas se muestran sin datos. La información de los clientes
+            de cada estudio es privada y no se publica.
+          </p>
           <div className="lp-shots">
             {IMAGENES.map((im, i) => (
               <div className={"lp-shot-row" + (i % 2 ? " lp-inv" : "")} key={im.t}>
@@ -307,7 +337,7 @@ export default function Landing() {
       </section>
 
       {/* ── Cómo funciona ── */}
-      <section className="lp-sec" id="como">
+      <section className="lp-sec lp-sec-alt" id="como">
         <div className="lp-wrap">
           <Titulo
             kicker="El mes, de punta a punta"
@@ -341,33 +371,12 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Accesos ── */}
-      <section className="lp-sec" id="accesos">
-        <div className="lp-wrap">
-          <Titulo
-            kicker="Accesos"
-            h="Entrá al estudio que te corresponde"
-            s="Cada estudio tiene su propia dirección, sus usuarios y sus datos. Un usuario de un estudio no entra por la puerta del otro."
-          />
-          <div className="lp-accesos">
-            {ACCESOS.map((a) => (
-              <a className="lp-acceso" key={a.id} href={a.url} style={{ "--c": a.color, "--a": a.accent }}>
-                <div className="lp-acceso-bar" />
-                <h3>{a.estudio}</h3>
-                <p>{a.bajada}</p>
-                <span className="lp-acceso-url">{a.url.replace("https://", "")}</span>
-                <span className="lp-acceso-go">Ingresar →</span>
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ── Pie ── */}
       <footer className="lp-foot">
         <div className="lp-wrap lp-foot-in">
           <div className="lp-brand">
-            <img src="/icon-192.png" alt="" />
+            <img src={LOGO} alt="" />
             <span>Obligo<b>.</b></span>
           </div>
           <p>Gestión contable para estudios uruguayos · Montevideo, Uruguay</p>
@@ -448,7 +457,9 @@ const CSS = `
 .lp-tag{display:inline-block;background:#fff;border:1px solid var(--line);border-radius:999px;
   padding:6px 15px;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:22px;}
 .lp-hero h1{font-size:clamp(30px,4.6vw,54px);font-weight:700;}
-.lp-lead{max-width:660px;margin:20px auto 0;font-size:17px;line-height:1.65;color:var(--muted);}
+/* La regla .lp p (margin 0) tiene la misma especificidad y gana por orden,
+   así que estos dos párrafos centrados llevan el elemento en el selector */
+.lp p.lp-lead{max-width:660px;margin:20px auto 0;font-size:17px;line-height:1.65;color:var(--muted);}
 .lp-cta{display:flex;gap:12px;justify-content:center;margin:30px 0 54px;flex-wrap:wrap;}
 
 /* secciones */
@@ -515,18 +526,15 @@ const CSS = `
 .lp-chip{border:1px solid #ffffff2e;background:#ffffff12;border-radius:999px;
   padding:9px 17px;font-size:14px;font-weight:500;color:#DCE5F7;}
 
-/* accesos */
-.lp-accesos{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;max-width:820px;margin:0 auto;}
-.lp-acceso{position:relative;border:1px solid var(--line);border-radius:16px;padding:32px 28px 26px;
-  background:#fff;overflow:hidden;transition:.15s;display:block;}
-.lp-acceso:hover{box-shadow:0 14px 40px #1b2a4a1f;transform:translateY(-2px);border-color:#C3CEEA;}
-.lp-acceso-bar{position:absolute;top:0;left:0;right:0;height:4px;
-  background:linear-gradient(90deg,var(--c),var(--a));}
-.lp-acceso h3{font-size:20px;font-weight:600;color:var(--c);}
-.lp-acceso p{font-size:14px;color:var(--muted);margin-top:6px;}
-.lp-acceso-url{display:block;margin-top:18px;font-size:12.5px;color:#93A0BC;
-  font-family:ui-monospace,Menlo,Consolas,monospace;word-break:break-all;}
-.lp-acceso-go{display:inline-block;margin-top:16px;font-size:14.5px;font-weight:600;color:var(--blue);}
+/* precarga */
+.lp-pre{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;max-width:900px;margin:0 auto;}
+.lp-pre-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px 24px;}
+.lp-pre-card h3{font-size:18px;font-weight:600;margin-bottom:9px;}
+.lp-pre-card p{font-size:14.5px;line-height:1.65;color:var(--muted);}
+
+/* aviso de privacidad de las capturas */
+.lp p.lp-privacidad{max-width:620px;margin:-26px auto 44px;text-align:center;font-size:13.5px;
+  line-height:1.6;color:#93A0BC;border:1px dashed var(--line);border-radius:10px;padding:12px 18px;}
 
 /* pie */
 .lp-foot{border-top:1px solid var(--line);padding:44px 0;background:var(--soft);}
@@ -543,7 +551,7 @@ const CSS = `
   .lp-nav{display:none;}
   .lp-sec{padding:60px 0;}
   .lp-hero{padding-top:48px;}
-  .lp-grid3,.lp-mods,.lp-accesos{grid-template-columns:1fr;}
+  .lp-grid3,.lp-mods,.lp-pre{grid-template-columns:1fr;}
   .lp-shot-row{grid-template-columns:1fr;gap:22px;}
   .lp-shot-row.lp-inv .lp-shot-txt{order:0;}
   .lp-shots{gap:44px;}
