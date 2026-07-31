@@ -53,6 +53,9 @@ function pd(p){const[m,y]=p.split("/");return new Date(+y,+m-1,1);}
 function dp(d){return`${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;}
 function prevP(p){const d=pd(p);d.setMonth(d.getMonth()-1);return dp(d);}
 function nextP(p){const d=pd(p);d.setMonth(d.getMonth()+1);return dp(d);}
+// Las obligaciones de un período se pagan al mes siguiente: lo de julio vence en agosto
+function vtoDGI(p,dia){return`${String(dia||22).padStart(2,"0")}/${nextP(p)}`;}
+function vtoBPS(p,dia){return`${String(dia||10).padStart(2,"0")}/${nextP(p)}`;}
 function daysUntil(s){if(!s)return null;return Math.round((new Date(s)-new Date(TODAY))/(86400000));}
 function dateAdd(dateStr,days){const d=new Date(dateStr);d.setDate(d.getDate()+days);return d.toISOString().split('T')[0];}
 
@@ -323,7 +326,8 @@ const normClient=(c)=>({
   credentials:c.credentials||mkCred(),
 });
 const CLIENTS_LASER=marcarAlDia([
-  mk(101,"Gabriela Martínez SAS","sas","servicios",{...mkTax("irae","basica",true),iraeEsFicto:true},{
+  // Coeficiente IRAE 0,0077 y anticipo de Patrimonio $1.117: salen de la planilla "Anticipos 2026" del estudio
+  mk(101,"Gabriela Martínez SAS","sas","servicios",{...mkTax("irae","basica",true),iraeEsFicto:true,iraeCoeficiente:0.0077,ipAnticipoMensual:1117},{
     giro:"Residenciales de adultos mayores (Palermo y Blanes) — 87300",rut:"219035810010",numEmpresa:"7.755.330",
     grupoMTSS:"15.4",grupoSubgrupo:"Grupo 15 / Subgrupo 4",phone:"24085583 · 098979748",whatsapp:"+598098979748",
     email:"sales@lasersolutions.com",startDate:"2021-10-14",cierreBalance:"31/12",efactura:"activo",
@@ -382,7 +386,7 @@ const CLIENTS_LASER=marcarAlDia([
 // Valores vigentes 2026: BPC $6.864 (Dec. 11/026) · SMN $24.572 (Dec. 319/025; desde 1/7/2026: $25.383)
 // IVA Mínimo $5.910 e IRAE mínimo $6.840 (Dec. 310/025) · UI al 12/06/2026: $6,5720 (ajusta a diario, ver BCU/INE)
 const LASER_CONFIG_DEFAULT={studioName:"Laser Solutions",studioCode:"LaserSolutions",studioRut:"",studioEmail:"sales@lasersolutions.com",studioPhone:"",adminPass:"laser2026",secretariaPass:"ayud123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000};
-const LASER_SEED_V="5";
+const LASER_SEED_V="6";
 
 // ─── ETIQUETAS ESPECIALES (Solo Web / Solo Marketing / Convenio pendiente) ───
 const SPECIAL_TAG_COLOR={"Solo Web":"#2948D9","Solo Marketing":"#8E44AD","Convenio pendiente":"#D97706"};
@@ -813,7 +817,7 @@ function Dashboard({clients,setClients,setView,openClient,user,proveedores,setPr
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
       <div style={{background:C.white,borderRadius:8,padding:14,boxShadow:"0 1px 3px #0001"}}>
         <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:10,display:"flex",alignItems:"center",gap:7,fontFamily:F}}>
-          <Logo src={LOGO_DGI} size={15}/>Vencimientos DGI — 22/{period}
+          <Logo src={LOGO_DGI} size={15}/>Vencimientos DGI — {vtoDGI(period)}
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto"}}>
           {clients.filter(c=>isConf(c)).flatMap(c=>getObs(c,period).filter(o=>o.freq==="mensual"&&o.org?.includes("DGI")).map(o=>({client:c,ob:o}))).slice(0,12).map((p,i)=>(
@@ -1130,6 +1134,46 @@ function EmpBlock({client,upd,addingEmp,setAddingEmp,newEmp,setNewEmp,addEmpF}){
 //  aportes: Jubilatorio 15% · FRL 0,1% · Seguro Enf. 3% · Adic. SNIS según empleado (0 si gravado < 2,5 BPC)
 const fU=(n,d=2)=>new Intl.NumberFormat("es-UY",{minimumFractionDigits:d,maximumFractionDigits:d}).format(n||0);
 const pKey=(p)=>{const[m,y]=(p||"").split("/");return(+y||0)*100+(+m||0);};
+
+// ─── CÁLCULO MENSUAL DE ANTICIPOS ─────────────────────────────────
+// Réplica de la planilla "Anticipos" del estudio (base: Gabriela Martínez SAS):
+//   IVA ventas   = facturación del mes × tasa
+//   IVA a pagar  = IVA ventas − IVA compras − retenciones de tarjetas − excedente del mes anterior
+//   Pago IVA     = si da positivo se paga redondeado; si da negativo no se paga y queda como excedente
+//   IRAE coef.   = (facturación + venta de activo fijo) × coeficiente
+//   IRAE a pagar = el mayor entre el coeficiente y el mínimo
+//   TOTAL        = Pago IVA + IRAE + anticipo de Impuesto al Patrimonio
+function calcAnticipos(client,period,config,depth=12){
+  const t=client.taxes||{};
+  const b=(client.billing||{})[period]||{};
+  const tasa=t.iva==="reducida"?0.10:t.iva==="basica"?0.22:0;
+  const ventas=+b.ventas||0;
+  const ivaVentas=b.ivaVentas!=null&&b.ivaVentas!==""?+b.ivaVentas:ventas*tasa;
+  const ivaCompras=+b.ivaCompras||0;
+  const retTarj=+b.retTarj||0;
+  // El excedente se arrastra solo desde el mes anterior; se puede pisar a mano
+  let excedentePrev=0;
+  if(b.excedenteManual!=null&&b.excedenteManual!=="")excedentePrev=+b.excedenteManual;
+  else if(depth>0)excedentePrev=calcAnticipos(client,prevP(period),config,depth-1).excedente;
+  const ivaAPagar=ivaVentas-ivaCompras-retTarj-excedentePrev;
+  const pagoIVA=ivaAPagar>0?Math.round(ivaAPagar):0;
+  const excedente=ivaAPagar<0?Math.round(Math.abs(ivaAPagar)):0;
+
+  const vtaFijo=+b.vtaActFijo||0;
+  const coef=+t.iraeCoeficiente||0;
+  const iraeCoef=(ventas+vtaFijo)*coef;
+  const iraeMin=t.iraeMinimoMensual!=null&&t.iraeMinimoMensual!==""?+t.iraeMinimoMensual:(config?.iraeMinimoMensual||0);
+  let irae=0;
+  if(t.renta==="irae"){
+    if(t.iraeMontoMensual!=null&&t.iraeMontoMensual!=="")irae=+t.iraeMontoMensual;
+    else irae=Math.round(Math.max(iraeCoef,iraeMin));
+  }
+  const ip=t.patrimonio?(t.ipAnticipoMensual!=null&&t.ipAnticipoMensual!==""?+t.ipAnticipoMensual:Math.round((+t.ipMontoAnual||0)/12)):0;
+  const ivaMinimo=t.iva==="minimo"?(config?.ivaMinimo||0):0;
+  const total=pagoIVA+irae+ip+ivaMinimo;
+  return{tasa,ventas,ivaVentas,ivaCompras,retTarj,excedentePrev,ivaAPagar,pagoIVA,excedente,vtaFijo,coef,iraeCoef,iraeMin,irae,ip,ivaMinimo,total,
+    cargado:!!(b.ventas||b.ivaCompras||b.retTarj||b.ivaVentas)};
+}
 
 // ─── CONSEJOS DE SALARIOS (actas MTSS) ────────────────────────────
 // Los ajustes se aplican desde el módulo de Sueldos y quedan con fecha de vigencia:
@@ -1518,11 +1562,12 @@ function buildLineasEmpresa(c,period,config){
   const t=c.taxes||{};const lines=[];
   const dgiDue=`${String(config?.diaDGI||22).padStart(2,"0")}/${nextP(period)}`;
   const bpsDue=`${String(config?.diaBPS||10).padStart(2,"0")}/${nextP(period)}`;
+  const calc=calcAnticipos(c,period,config);
   if(t.iva==="minimo")lines.push({org:"DGI",label:"IVA Mínimo (Literal E) — Form. 2908",due:dgiDue,amount:config?.ivaMinimo||null});
-  if(t.iva==="basica"||t.iva==="reducida")lines.push({org:"DGI",label:`IVA ${t.iva==="basica"?"tasa básica 22%":"tasa reducida 10%"} — DJ 2178`,due:dgiDue,amount:null});
+  if(t.iva==="basica"||t.iva==="reducida")lines.push({org:"DGI",label:`IVA ${t.iva==="basica"?"tasa básica 22%":"tasa reducida 10%"} — DJ 2178`+(calc.excedente>0?` (mes sin pago, excedente de $ ${fU(calc.excedente,2)})`:""),due:dgiDue,amount:calc.cargado?calc.pagoIVA:null});
   if(t.iva==="sp")lines.push({org:"DGI",label:"IVA Servicios Personales — Form. 1302",due:dgiDue,amount:null});
   if(t.iva==="monotributo")lines.push({org:"BPS",label:"Cuota Monotributo unificada",due:bpsDue,amount:null});
-  if(t.renta==="irae")lines.push({org:"DGI",label:`Anticipo IRAE${t.iraeEsFicto?" (régimen ficto)":""}`,due:dgiDue,amount:t.iraeMontoMensual||null});
+  if(t.renta==="irae")lines.push({org:"DGI",label:`Anticipo IRAE${t.iraeEsFicto?" (régimen ficto)":""}`,due:dgiDue,amount:calc.irae||t.iraeMontoMensual||null});
   if(t.renta==="irpf_cat2")lines.push({org:"DGI",label:"Anticipo IRPF Cat. II / FONASA serv. personales",due:dgiDue,amount:null});
   if(t.patrimonio)lines.push({org:"DGI",label:"Anticipo Impuesto al Patrimonio",due:dgiDue,amount:t.ipAnticipoMensual||null});
   if(c.hasEmployees&&(c.employees||[]).length){
@@ -1647,6 +1692,115 @@ function ReporteModal({clients,initialIds,period,config,onClose}){
       <div style={{padding:"12px 18px",borderTop:`1px solid ${C.border}`,display:"flex",gap:9,alignItems:"center",background:C.white}}>
         <input value={notaGeneral} onChange={e=>setNotaGeneral(e.target.value)} placeholder="Notas generales del reporte (opcional)" style={{...inp,flex:1}}/>
         <button onClick={generar} disabled={Object.keys(sel).length===0} style={{background:Object.keys(sel).length?"linear-gradient(135deg,#2948D9,#1E37A8)":C.border,color:Object.keys(sel).length?"#fff":C.gray,border:"none",borderRadius:9,padding:"10px 20px",fontSize:13,fontWeight:800,cursor:Object.keys(sel).length?"pointer":"default",fontFamily:F,whiteSpace:"nowrap"}}>Generar PDF</button>
+      </div>
+    </div>
+  </div>;
+}
+
+// ─── CÁLCULO DEL MES (facturación → impuestos a pagar) ────────────
+function CalculoMes({client,upd,updTax,period,config}){
+  const {m:cmM}=useR();
+  const [verParams,setVerParams]=useState(false);
+  const b=(client.billing||{})[period]||{};
+  const setB=(patch)=>upd("billing",{...(client.billing||{}),[period]:{...b,...patch}});
+  const r=calcAnticipos(client,period,config);
+  const t=client.taxes||{};
+  const money=(n)=>"$ "+fU(n,2);
+  const inNum=(val,onCh,ph="0")=><input type="number" step="0.01" value={val??""} placeholder={ph} onChange={e=>onCh(e.target.value===""?null:+e.target.value)} style={{...inp,padding:"7px 9px",fontSize:13,textAlign:"right",fontVariantNumeric:"tabular-nums"}}/>;
+  const Fila=({label,valor,detalle,color,fuerte,negativo})=>(
+    <div style={{display:"flex",alignItems:"baseline",gap:8,padding:"5px 0",borderBottom:`1px dotted ${C.border}`}}>
+      <div style={{fontSize:fuerte?12.5:12,color:fuerte?C.navy:C.gray,fontWeight:fuerte?700:400,fontFamily:F}}>{label}</div>
+      {detalle&&<div style={{fontSize:10.5,color:C.gray,fontFamily:F}}>{detalle}</div>}
+      <div style={{flex:1}}/>
+      <div style={{fontSize:fuerte?13.5:12.5,fontWeight:fuerte?800:600,color:color||C.navy,fontFamily:F,fontVariantNumeric:"tabular-nums",whiteSpace:"nowrap"}}>{negativo?"−":""}{money(Math.abs(valor))}</div>
+    </div>);
+  return<div style={{background:C.white,borderRadius:10,boxShadow:"0 1px 3px #0001",border:`1px solid ${C.border}`,overflow:"hidden"}}>
+    <div style={{background:C.navy,padding:"11px 15px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+      <div style={{flex:1,minWidth:190}}>
+        <div style={{color:"#fff",fontWeight:700,fontSize:14,fontFamily:F}}>Cálculo del mes — {periodoLargo(period)}</div>
+        <div style={{color:"#8ECBDE",fontSize:11,fontFamily:F,marginTop:2}}>Cargá la facturación y el resto se calcula solo. Vence el {vtoDGI(period,config?.diaDGI)}.</div>
+      </div>
+      <button onClick={()=>setVerParams(p=>!p)} style={{background:"#ffffff1a",color:"#fff",border:"1px solid #ffffff33",borderRadius:8,padding:"6px 12px",fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:F}}>{verParams?"Ocultar parámetros":"⚙ Parámetros"}</button>
+    </div>
+
+    {verParams&&<div style={{padding:"12px 15px",background:C.bg,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:cmM?"1fr":"repeat(3,1fr)",gap:10}}>
+      <div><label style={lbl}>Coeficiente IRAE</label>{inNum(t.iraeCoeficiente,v=>updTax("iraeCoeficiente",v),"0.0077")}</div>
+      <div><label style={lbl}>IRAE mínimo mensual ($)</label>{inNum(t.iraeMinimoMensual,v=>updTax("iraeMinimoMensual",v),String(config?.iraeMinimoMensual||6840))}</div>
+      <div><label style={lbl}>IRAE fijo mensual ($)</label>{inNum(t.iraeMontoMensual,v=>updTax("iraeMontoMensual",v),"si se completa, manda")}</div>
+      <div><label style={lbl}>Anticipo Patrimonio ($)</label>{inNum(t.ipAnticipoMensual,v=>updTax("ipAnticipoMensual",v),"1117")}</div>
+      <div style={{gridColumn:cmM?"1":"2 / span 2",fontSize:10.5,color:C.gray,fontFamily:F,alignSelf:"end",lineHeight:1.5}}>
+        El IRAE se paga por el mayor entre el coeficiente y el mínimo. Si cargás un IRAE fijo mensual, se usa ese.
+      </div>
+    </div>}
+
+    <div style={{padding:"13px 15px",display:"grid",gridTemplateColumns:cmM?"1fr":"320px 1fr",gap:16}}>
+      <div style={{display:"flex",flexDirection:"column",gap:9}}>
+        <div>
+          <label style={lbl}>Facturación del mes — ventas netas ($)</label>
+          {inNum(b.ventas,v=>setB({ventas:v}),"0")}
+          <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>Es la base del IRAE por coeficiente.</div>
+        </div>
+        {r.tasa>0&&<div>
+          <label style={lbl}>IVA ventas del mes ($)</label>
+          {inNum(b.ivaVentas,v=>setB({ivaVentas:v}),String(Math.round(r.ventas*r.tasa)))}
+          <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>
+            {b.ivaVentas!=null&&b.ivaVentas!==""
+              ?<>Cargado a mano: <b style={{color:C.navy}}>{money(r.ivaVentas)}</b>. Vacío = {Math.round(r.tasa*100)}% de la facturación.</>
+              :<>Se calcula solo: {Math.round(r.tasa*100)}% = <b style={{color:C.navy}}>{money(r.ivaVentas)}</b>. Si tenés el dato exacto del reporte de e-facturas, cargalo acá.</>}
+          </div>
+        </div>}
+        <div><label style={lbl}>IVA compras del mes ($)</label>{inNum(b.ivaCompras,v=>setB({ivaCompras:v}),"0")}</div>
+        <div><label style={lbl}>Retenciones de tarjetas ($)</label>{inNum(b.retTarj,v=>setB({retTarj:v}),"0")}</div>
+        <div>
+          <label style={lbl}>Excedente del mes anterior ($)</label>
+          {inNum(b.excedenteManual,v=>setB({excedenteManual:v}),String(Math.round(r.excedentePrev)))}
+          <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>Se arrastra solo del mes anterior. Completá sólo si querés pisarlo.</div>
+        </div>
+        {t.renta==="irae"&&<div><label style={lbl}>Venta de activo fijo ($)</label>{inNum(b.vtaActFijo,v=>setB({vtaActFijo:v}),"0")}
+          <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>Se suma a la facturación sólo para el IRAE.</div></div>}
+      </div>
+
+      <div>
+        {(t.iva==="basica"||t.iva==="reducida")&&<div style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:1,color:C.gray,fontFamily:F,marginBottom:4}}>IVA</div>
+          <Fila label="IVA ventas" detalle={`${Math.round(r.tasa*100)}% de ${money(r.ventas)}`} valor={r.ivaVentas}/>
+          <Fila label="IVA compras" valor={r.ivaCompras} negativo color={C.gray}/>
+          {r.retTarj>0&&<Fila label="Retenciones de tarjetas" valor={r.retTarj} negativo color={C.gray}/>}
+          {r.excedentePrev>0&&<Fila label="Excedente del mes anterior" valor={r.excedentePrev} negativo color={C.gray}/>}
+          <Fila label={r.ivaAPagar>=0?"IVA a pagar":"IVA a favor"} valor={r.ivaAPagar} fuerte color={r.ivaAPagar>0?C.navy:C.ok}/>
+          {r.excedente>0&&<div style={{fontSize:11,color:C.ok,fontFamily:F,marginTop:5,background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:6,padding:"6px 9px"}}>
+            Este mes no se paga IVA. Quedan <b>{money(r.excedente)}</b> de excedente, que se descuentan solos el mes que viene.
+          </div>}
+        </div>}
+        {t.iva==="minimo"&&<div style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:1,color:C.gray,fontFamily:F,marginBottom:4}}>IVA</div>
+          <Fila label="IVA Mínimo (Literal E)" detalle="cuota fija mensual" valor={r.ivaMinimo} fuerte/>
+        </div>}
+
+        {t.renta==="irae"&&<div style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:1,color:C.gray,fontFamily:F,marginBottom:4}}>IRAE</div>
+          {t.iraeMontoMensual!=null&&t.iraeMontoMensual!==""
+            ?<Fila label="Anticipo IRAE" detalle="monto fijo cargado" valor={r.irae} fuerte/>
+            :<>
+              <Fila label="Por coeficiente" detalle={`${money(r.ventas+r.vtaFijo)} × ${r.coef||0}`} valor={r.iraeCoef}/>
+              <Fila label="Mínimo del mes" valor={r.iraeMin}/>
+              <Fila label={r.iraeCoef>=r.iraeMin?"Se paga el coeficiente":"Se paga el mínimo"} valor={r.irae} fuerte/>
+            </>}
+        </div>}
+
+        {t.patrimonio&&<div style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:1,color:C.gray,fontFamily:F,marginBottom:4}}>PATRIMONIO</div>
+          <Fila label="Anticipo mensual" valor={r.ip} fuerte/>
+        </div>}
+
+        <div style={{background:C.navy,borderRadius:9,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
+          <div>
+            <div style={{color:"#8ECBDE",fontSize:10,fontWeight:700,letterSpacing:1,fontFamily:F}}>TOTAL A PAGAR</div>
+            <div style={{color:"#ffffffaa",fontSize:10.5,fontFamily:F,marginTop:2}}>vence el {vtoDGI(period,config?.diaDGI)}</div>
+          </div>
+          <div style={{color:"#fff",fontSize:22,fontWeight:800,fontFamily:F,fontVariantNumeric:"tabular-nums"}}>{money(r.total)}</div>
+        </div>
+        {!r.cargado&&<div style={{fontSize:11,color:C.gray,fontFamily:F,marginTop:7}}>Todavía no cargaste la facturación de este mes: el total muestra sólo los importes fijos.</div>}
       </div>
     </div>
   </div>;
@@ -1882,26 +2036,6 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
               </div>
             </div>
           </>}
-          {(client.taxes?.iva==="basica"||client.taxes?.iva==="reducida")&&<>
-            <div style={{gridColumn:"1/-1",background:"#ECFDF5",borderRadius:7,padding:"10px 12px"}}>
-              <div style={{fontWeight:600,color:"#065F46",fontSize:12,marginBottom:8,fontFamily:F}}>IVA – Anticipo mensual</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                <div>
-                  <label style={lbl}>IVA Ventas del mes ($)</label>
-                  <NumInput value={client.ivaVentasMes} onChange={v=>upd("ivaVentasMes",v)} style={inp} placeholder="Ej: 50000"/>
-                </div>
-                <div>
-                  <label style={lbl}>IVA Compras del mes ($)</label>
-                  <NumInput value={client.ivaComprasMes} onChange={v=>upd("ivaComprasMes",v)} style={inp} placeholder="Ej: 30000"/>
-                </div>
-                <div style={{gridColumn:"1/-1"}}>
-                  <label style={lbl}>IVA a favor acumulado ($)</label>
-                  <NumInput value={client.ivaFavorAcumulado||0} onChange={v=>upd("ivaFavorAcumulado",v||0)} style={inp} placeholder="0"/>
-                  {(()=>{const vv=client.ivaVentasMes||0,cc=client.ivaComprasMes||0,ff=client.ivaFavorAcumulado||0;const rr=vv-cc-ff;return rr<0?<div style={{fontSize:11,color:C.ok,marginTop:4,fontFamily:F}}>IVA a favor este mes: $ {Math.abs(rr).toLocaleString("es-UY")} — actualizar campo arriba para el próximo mes</div>:rr>0?<div style={{fontSize:11,color:C.blue,marginTop:4,fontFamily:F}}>Anticipo IVA: $ {rr.toLocaleString("es-UY")}</div>:null;})()}
-                </div>
-              </div>
-            </div>
-          </>}
         </FormSection>}
 
         <FormSection title="Certificados DGI">
@@ -1962,6 +2096,7 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
       {tab==="sueldos"&&<SueldosModule client={client} upd={upd} period={period} config={config}/>}
 
       {tab==="tributario"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
+        {isConf(client)&&<CalculoMes client={client} upd={upd} updTax={updTax} period={period} config={config}/>}
         {(()=>{
           if(!client.cierreBalance)return null;
           const [dd,mm]=client.cierreBalance.split("/");
@@ -2335,12 +2470,14 @@ function CalendarioView({clients,config,openClient,globalPeriod}){
       const d=parseInt(t.due.substring(8));
       addEv(d,{client:c,type:"task",label:t.label,done:t.done,org:t.cat==="dgi"?"DGI":t.cat==="bps"?"BPS":t.cat==="bse"?"BSE":"Otro"});
     });
-    // Obligaciones mensuales
+    // Obligaciones mensuales: las que vencen en este mes son las del período anterior
+    // (lo de julio se paga en agosto)
     if(isConf(c)){
-      const obs=getObs(c,calPeriod);
+      const cargo=prevP(calPeriod);
+      const obs=getObs(c,cargo);
       obs.filter(o=>o.freq==="mensual").forEach(o=>{
         const dueDay=o.org==="BPS"?(config.diaBPS||10):(config.diaDGI||22);
-        addEv(dueDay,{client:c,type:"obligation",label:o.label,org:o.org||"DGI"});
+        addEv(dueDay,{client:c,type:"obligation",label:`${o.label} · período ${cargo}`,org:o.org||"DGI"});
       });
     }
   });
