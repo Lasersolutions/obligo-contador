@@ -19,6 +19,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const LOGO = "/obligo-iso.png";
+const LOGO_LASER = "/laser-iso.png";
 
 export function isLandingHost() {
   if (typeof window === "undefined") return false;
@@ -191,7 +192,10 @@ export default function Landing() {
       if (!l) { l = document.createElement("link"); l.rel = "icon"; document.head.appendChild(l); }
       l.type = "image/png";
       l.href = LOGO;
+      // index.css deja el fondo claro de la app; si la ventana es más alta
+      // que la landing se vería una franja gris debajo del pie
       document.documentElement.style.background = "#070C18";
+      document.body.style.background = "#070C18";
     } catch (e) {}
     const onScroll = () => setScrolled(window.scrollY > 12);
     onScroll();
@@ -433,7 +437,14 @@ export default function Landing() {
             <span className="lp-brand-tx">Obligo<b>.</b></span>
           </a>
           <p>Gestión contable para estudios uruguayos · Montevideo, Uruguay</p>
-          <p className="lp-foot-sm">Desarrollado por Laser Solutions</p>
+
+          <div className="lp-ls">
+            <img src={LOGO_LASER} alt="Laser Solutions SAS" />
+            <span>
+              Desarrollado por <b>Laser Solutions SAS</b>
+              <sup title="Marca registrada">®</sup>
+            </span>
+          </div>
         </div>
       </footer>
     </div>
@@ -544,7 +555,7 @@ const CSS = `
   --m:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
 
   font-family:var(--f);color:var(--t1);background:var(--deep);
-  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;min-height:100vh;
 }
 .lp *{box-sizing:border-box;}
 .lp h1,.lp h2,.lp h3{margin:0;letter-spacing:-.02em;font-weight:600;line-height:1.16;}
@@ -798,11 +809,17 @@ const CSS = `
 .lp-tag:hover{border-color:rgba(140,165,255,.4);color:var(--t1);background:rgba(68,99,236,.1);}
 
 /* pie */
-.lp-foot{border-top:1px solid var(--line-soft);padding:56px 0;background:var(--page);}
+.lp-foot{border-top:1px solid var(--line-soft);padding:56px 0 48px;background:var(--page);}
 .lp-foot-in{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;}
 .lp-foot p{font-size:var(--fs-small);color:var(--t2);}
-.lp-foot-sm{font-family:var(--m);font-size:var(--fs-caption);letter-spacing:.06em;
-  text-transform:uppercase;color:var(--t3);}
+/* firma de Laser Solutions */
+.lp-ls{display:flex;align-items:center;gap:12px;margin-top:22px;padding-top:24px;
+  border-top:1px solid var(--line-soft);width:100%;max-width:420px;justify-content:center;}
+.lp-ls img{height:34px;width:auto;display:block;flex:none;
+  filter:brightness(1.35) saturate(1.05);}
+.lp-ls span{font-size:var(--fs-small);color:var(--t2);letter-spacing:.01em;}
+.lp-ls b{color:var(--t1);font-weight:600;}
+.lp-ls sup{font-size:10px;margin-left:2px;color:var(--t2);vertical-align:super;}
 
 /* ── responsive ── */
 @media(max-width:1080px){
