@@ -604,7 +604,12 @@ function LoginScreen({onLogin}){
       <div style={{marginBottom:20}}><label style={lbl}>Contraseña</label><div style={{position:"relative"}}><input type={show?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)} style={{...inp,borderRadius:9,padding:"10px 50px 10px 11px"}} onKeyDown={e=>e.key==="Enter"&&login()}/><button onClick={()=>setShow(p=>!p)} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",cursor:"pointer",fontSize:11,color:"#5B6B8C",fontFamily:F}}>{show?"Ocultar":"Ver"}</button></div></div>
       {err&&<div style={{color:"#DC2626",fontSize:12,marginBottom:12}}>{err}</div>}
       <button onClick={login} style={{width:"100%",background:"linear-gradient(135deg,#2948D9,#1E37A8)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F,letterSpacing:.3,boxShadow:"0 6px 18px #2948D955"}}>Ingresar</button>
-      <div style={{marginTop:16,fontSize:10,color:"#9AA7C2",textAlign:"center",fontFamily:F}}>Laser Solutions · Montevideo, Uruguay</div>
+      <div style={{marginTop:16,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+        <img src={LOGO_OBLIGO} alt="" style={{width:19,height:19}}/>
+        <div style={{fontSize:10.5,color:"#9AA7C2",fontFamily:F,letterSpacing:.3,lineHeight:1.3,textAlign:"left"}}>
+          <b style={{color:"#021942",fontWeight:800,letterSpacing:0}}>Obligo</b> · Laser Solutions<br/>Montevideo, Uruguay
+        </div>
+      </div>
     </div>
   </div>;
   return<div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",background:"linear-gradient(160deg,#08152B 0%,#14294F 55%,#1E3A6B 100%)",fontFamily:F,padding:16,boxSizing:"border-box"}}>
