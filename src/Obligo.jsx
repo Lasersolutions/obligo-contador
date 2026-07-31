@@ -232,7 +232,34 @@ const mk=(id,name,entityType,nature,taxes,opts={})=>{
     ...o};
 };
 
-const CLIENTS_INIT=[
+// El estudio se puso al día: todo lo que vencía hasta esta fecha se considera presentado.
+// Lo de julio (que se hace en agosto) y lo posterior sigue pendiente, como corresponde.
+const AL_DIA_HASTA="2026-07-30";
+const CLEANUP_V="1";
+function marcarAlDia(list){
+  return (list||[]).map(c=>({...c,tasks:(c.tasks||[]).map(t=>(t.due&&t.due<=AL_DIA_HASTA&&!t.done)?{...t,done:true}:t)}));
+}
+// Carga los clientes guardados en el navegador, normalizados y con el "al día" aplicado una sola vez
+function cargarLista(key,fallback){
+  try{
+    const s=localStorage.getItem(key);
+    if(s){
+      const d=JSON.parse(s);
+      if(d&&d.length){
+        let out=d.map(normClient);
+        const ck=key.indexOf("ls_")===0?"ls_cleanup":"gc_cleanup";
+        if(localStorage.getItem(ck)!==CLEANUP_V){
+          out=marcarAlDia(out);
+          try{localStorage.setItem(ck,CLEANUP_V);localStorage.setItem(key,JSON.stringify(out));}catch(e){}
+        }
+        return out;
+      }
+    }
+  }catch(e){}
+  return fallback;
+}
+
+const CLIENTS_INIT=marcarAlDia([
   mk(1,"Dardo Frabasil","unipersonal","transporte",mkTax("irpf_cat2","basica"),{giro:"Transporte y comercio",numEmpresa:"1.529.200",rut:"030072740010",certDGI:"2025-11-30",specialTaxes:["gasoil"],notes:"IVA 22% + transporte.",tasks:[{id:1,label:"DJ IVA mensual (2178) – marzo",due:"2026-04-22",done:false,freq:"mensual",cat:"dgi"},{id:2,label:"Aportes BPS – marzo",due:"2026-04-10",done:true,freq:"mensual",cat:"bps"}]}),
   mk(2,"Ana Batista","persona_fisica","capital_inmobiliario",mkTax("irpf_cat1","no_aplica"),{giro:"Arrendamiento de inmuebles",numEmpresa:"3.308.890",rut:"100465510015",certDGI:"2025-12-31",efactura:"no_aplica",credentials:{...mkCred(),usuarioGUB:{user:"",pass:"eoaf12184."}},tasks:[{id:1,label:"DDJJ IRPF anual 2025",due:"2026-06-30",done:false,freq:"anual",cat:"dgi"}]}),
   mk(3,"Álvaro Lucas","unipersonal","transporte",mkTax("irae","basica",true),{giro:"Flete y transporte de carga",numEmpresa:"6.382.242",rut:"100544740013",tasks:[{id:1,label:"Anticipo IRAE – marzo",due:"2026-04-22",done:false,freq:"mensual",cat:"dgi"}]}),
@@ -275,7 +302,7 @@ const CLIENTS_INIT=[
   mk(40,"Claudia Plada","persona_fisica","otro",mkTax(),{numEmpresa:"4.810.058",certDGI:"2026-06-30",efactura:"pendiente"}),
   mk(41,"Britos María del Valle","persona_fisica","otro",mkTax(),{certDGI:"2025-10-31",efactura:"pendiente"}),
   mk(42,"Silvera y otros SH","soc_hecho","otro",mkTax(),{numEmpresa:"7.447.167",rut:"100828510012",efactura:"pendiente"}),
-];
+]);
 
 // ─── CLIENTES LASER SOLUTIONS ─────────────────────────────────────
 // Empleado extendido para liquidación de sueldos (módulo Sueldos)
@@ -295,7 +322,7 @@ const normClient=(c)=>({
   nominas:c.nominas||{},sueldos:c.sueldos||{},billing:c.billing||{},facturas:c.facturas||{},boletos:c.boletos||{},
   credentials:c.credentials||mkCred(),
 });
-const CLIENTS_LASER=[
+const CLIENTS_LASER=marcarAlDia([
   mk(101,"Gabriela Martínez SAS","sas","servicios",{...mkTax("irae","basica",true),iraeEsFicto:true},{
     giro:"Residenciales de adultos mayores (Palermo y Blanes) — 87300",rut:"219035810010",numEmpresa:"7.755.330",
     grupoMTSS:"15.4",grupoSubgrupo:"Grupo 15 / Subgrupo 4",phone:"24085583 · 098979748",whatsapp:"+598098979748",
@@ -351,7 +378,7 @@ const CLIENTS_LASER=[
   mk(107,"Mónica Menéndez","persona_fisica","otro",mkTax(),{
     giro:"Persona física — IASS (jubilaciones y pensiones)",specialTag:"Convenio pendiente",efactura:"no_aplica",
     notes:"IASS: impuesto de asistencia a la seguridad social sobre jubilaciones/pensiones. Estado: convenio pendiente de firma."}),
-];
+]);
 // Valores vigentes 2026: BPC $6.864 (Dec. 11/026) · SMN $24.572 (Dec. 319/025; desde 1/7/2026: $25.383)
 // IVA Mínimo $5.910 e IRAE mínimo $6.840 (Dec. 310/025) · UI al 12/06/2026: $6,5720 (ajusta a diario, ver BCU/INE)
 const LASER_CONFIG_DEFAULT={studioName:"Laser Solutions",studioCode:"LaserSolutions",studioRut:"",studioEmail:"sales@lasersolutions.com",studioPhone:"",adminPass:"laser2026",secretariaPass:"ayud123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000};
@@ -2572,7 +2599,7 @@ export default function Obligo(){
   const [view,setView]=useState("dashboard");
   const [clientId,setClientId]=useState(null);
   const [clients,setClients]=useState(()=>{
-    try{const s=localStorage.getItem('gc_clients');if(s){const d=JSON.parse(s);if(d&&d.length)return d.map(normClient);}}catch(e){}
+    const g=cargarLista('gc_clients',null);if(g)return g;
     return CLIENTS_INIT;
   });
   useEffect(()=>{if(!authUser)return;try{localStorage.setItem(studio==="laser"?'ls_clients':'gc_clients',JSON.stringify(clients));}catch(e){};},[clients,studio,authUser]);
@@ -2587,7 +2614,7 @@ export default function Obligo(){
   useEffect(()=>{if(!authUser)return;try{localStorage.setItem(studio==="laser"?'ls_config':'gc_config',JSON.stringify(config));}catch(e){}},[config,studio,authUser]);
 
   // Cada estudio carga y guarda sus propios datos; los de Valeria Calvette (gc_*) no se tocan desde Laser (ls_*)
-  const loadList=(key,fallback)=>{try{const s=localStorage.getItem(key);if(s){const d=JSON.parse(s);if(d&&d.length)return d.map(normClient);}}catch(e){}return fallback;};
+  const loadList=cargarLista;
   const loadObj=(key,fallback)=>{try{const s=localStorage.getItem(key);if(s)return{...fallback,...JSON.parse(s)};}catch(e){}return fallback;};
   const handleLogin=(u,st="vc")=>{
     applyStudio(st);
