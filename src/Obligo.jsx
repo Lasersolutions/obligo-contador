@@ -56,6 +56,7 @@ function nextP(p){const d=pd(p);d.setMonth(d.getMonth()+1);return dp(d);}
 // Las obligaciones de un período se pagan al mes siguiente: lo de julio vence en agosto
 function vtoDGI(p,dia){return`${String(dia||22).padStart(2,"0")}/${nextP(p)}`;}
 function vtoBPS(p,dia){return`${String(dia||10).padStart(2,"0")}/${nextP(p)}`;}
+function vtoISO(v){const[d,mm,y]=(v||"").split("/");return y?`${y}-${mm}-${d}`:"";}
 function daysUntil(s){if(!s)return null;return Math.round((new Date(s)-new Date(TODAY))/(86400000));}
 function dateAdd(dateStr,days){const d=new Date(dateStr);d.setDate(d.getDate()+days);return d.toISOString().split('T')[0];}
 
@@ -68,6 +69,9 @@ const RENTA_OPT=[["ninguno","Sin renta / No aplica"],["irpf_cat1","IRPF Cat I �
 const IVA_OPT=[["no_aplica","No aplica"],["basica","Tasa básica 22%"],["reducida","Tasa reducida 10%"],["minimo","IVA Mínimo – Literal E (Form. 2908)"],["sp","IVA Serv. Personales (Form. 1302)"],["monotributo","Monotributo (cuota unificada)"]];
 const MTSS_GRUPOS=["1","2","3","4","5","6","7","8","9","10","Fuera de convenio"];
 const LOGO_EFACTURA=(()=>{const s='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none"><path d="M11 27Q3 27 3 19Q3 11 11 10Q13 2 23 2Q33 2 35 10Q45 10 45 18Q45 27 35 27Z" fill="white" stroke="#3B7DB8" stroke-width="2.5"/><rect x="14" y="22" width="20" height="24" rx="2" fill="#3B7DB8"/><rect x="18" y="29" width="12" height="2" rx="1" fill="white"/><rect x="18" y="34" width="12" height="2" rx="1" fill="white"/><rect x="18" y="39" width="8" height="2" rx="1" fill="white"/></svg>';return "data:image/svg+xml,"+encodeURIComponent(s);})();
+// Isotipo de Obligo: el anillo partido en dos arcos azules con el realce navy interior.
+// Se dibuja a mano en SVG para que pese nada y se vea nítido en cualquier tamaño.
+const LOGO_OBLIGO=(()=>{const s=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="og1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1D4ED8"/><stop offset="1" stop-color="#2948D9"/></linearGradient><linearGradient id="og2" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2E90FA"/><stop offset="1" stop-color="#41B0FF"/></linearGradient></defs><path d="M78.95,14.25 A46,46 0 0 0 14.25,78.95 L29.79,66.36 A26,26 0 0 1 66.36,29.79 Z" fill="url(#og1)"/><path d="M21.05,85.75 A46,46 0 0 0 85.75,21.05 L70.21,33.64 A26,26 0 0 1 33.64,70.21 Z" fill="url(#og2)"/><path d="M17.09,31 A38,38 0 0 0 18.87,71.8 L28.7,64.91 A26,26 0 0 1 27.48,37 Z" fill="#0A1F4E"/></svg>`;return "data:image/svg+xml,"+encodeURIComponent(s);})();
 const PROV_CATS=["Software / SaaS","Asesoramiento","Alquiler","Servicios profesionales","Banco","Seguros","Impuestos estudio","Otro"];
 
 // ─── USERS ────────────────────────────────────────────────────────
@@ -173,31 +177,55 @@ function getObs(client,period=""){const _pm=parseInt((period||"").split("/")[0]|
 }
 
 // ─── CALC 2908 ─────────────────────────────────────────────────────
-function calc2908(client,cfg={}){
+// Renglones del boleto 2908 de un período. Los importes salen del cálculo del mes
+// (coeficiente vs. mínimo en IRAE, IVA según la facturación cargada) y cada uno se
+// puede pisar a mano desde Tributario: queda guardado en client.anticipos[período].
+function calc2908(client,cfg={},period=""){
   const t=client.taxes||{};
+  const per=period||PINIT;
+  const ov=(client.anticipos||{})[per]||{};
+  const a=calcAnticipos(client,per,cfg);
   const items=[];
+  const add=(key,label,auto,hint)=>{
+    const manual=ov[key]!=null&&ov[key]!=="";
+    items.push({key,label,monto:Math.round(manual?+ov[key]||0:auto||0),auto:Math.round(auto||0),manual,hint:hint||""});
+  };
   if(t.renta==="irae"){
-    const m=t.iraeEsMinimo?(cfg.iraeMinimoMensual||6550):(t.iraeMontoMensual||0);
-    items.push({label:"Anticipo IRAE",monto:m,hint:t.iraeEsMinimo?"Mínimo":t.iraeCoeficiente?`Coef. ${t.iraeCoeficiente}`:""});
+    const usaMin=t.iraeEsMinimo||!(a.iraeCoef>a.iraeMin);
+    add("irae","Anticipo IRAE",t.iraeEsMinimo?a.iraeMin:a.irae,
+      t.iraeMontoMensual!=null&&t.iraeMontoMensual!==""&&!t.iraeEsMinimo?"Monto fijo del cliente"
+      :usaMin?`Mínimo del año ($ ${fU(a.iraeMin,0)})`
+      :`Coeficiente ${t.iraeCoeficiente} sobre la facturación`);
   }
-  if(t.patrimonio&&t.renta!=="ninguno"){
-    const m=t.ipAnticipoMensual!=null?t.ipAnticipoMensual:Math.round((t.ipMontoAnual||0)/12);
-    items.push({label:"Anticipo IP",monto:m,hint:t.ipMontoAnual?`Anual: $${Number(t.ipMontoAnual).toLocaleString("es-UY")}`:""});
-  }
-  if(client.entityType==="sa"){
-    items.push({label:"ICOSA mensual",monto:client.icosaMonto||0});
-  }
-  if(t.iva==="minimo"){
-    items.push({label:"IVA Mínimo Lit. E",monto:cfg.ivaMinimo||4500});
-  }else if(t.iva==="basica"||t.iva==="reducida"){
-    const ventas=client.ivaVentasMes||0,compras=client.ivaComprasMes||0,favor=client.ivaFavorAcumulado||0;
-    const bruto=ventas-compras-favor;
-    const anticipo=Math.max(0,bruto);
-    const ivaFavor=bruto<0?Math.abs(bruto):0;
-    items.push({label:"IVA – Anticipo",monto:anticipo,hint:ivaFavor>0?`IVA a favor: $${ivaFavor.toLocaleString("es-UY")}`:"",ivaFavor});
-  }
+  if(t.patrimonio&&t.renta!=="ninguno")add("ip","Anticipo Impuesto al Patrimonio",a.ip,t.ipMontoAnual?`Anual: $ ${fU(+t.ipMontoAnual,0)}`:"");
+  if(client.entityType==="sa")add("icosa","ICOSA mensual",client.icosaMonto||0);
+  if(t.iva==="minimo")add("ivaMin","IVA Mínimo — Literal E",cfg.ivaMinimo||0,"Valor fijo del año");
+  else if(t.iva==="basica"||t.iva==="reducida")add("iva",`IVA del mes (tasa ${t.iva==="basica"?"básica 22%":"reducida 10%"})`,a.pagoIVA,
+    a.excedente>0?`Mes sin pago · quedan $ ${fU(a.excedente,2)} de excedente para el mes que viene`
+    :a.cargado?"Según la facturación cargada":"Falta cargar la facturación del mes");
   const total=items.reduce((s,x)=>s+x.monto,0);
   return {items,total};
+}
+
+// Aportes de BPS del mes, sumando la liquidación de cada empleado.
+function aportesBPS(client,period,config){
+  if(!client.hasEmployees||!(client.employees||[]).length)return 0;
+  const inc=(client.sueldos||{})[period]||{};
+  const opts={period,bpc:config?.bpc||6864,antigTope:client.antigTope!=null?client.antigTope:null};
+  return Math.round((client.employees||[]).reduce((a,e)=>a+calcRecibo(e,inc[e.id]||{},opts).aportes,0));
+}
+
+// Lo que hay que pagar este mes en cada organismo: es la línea que se ve en el Panel.
+function resumenMes(client,period,config){
+  const obs=getObs(client,period).filter(o=>o.freq==="mensual");
+  const out=[];
+  if(obs.some(o=>(o.org||"").includes("DGI")))
+    out.push({org:"dgi",label:"DGI",logo:LOGO_DGI,color:C.red,vto:vtoDGI(period,config?.diaDGI),
+      monto:calc2908(client,config,period).total,n:obs.filter(o=>(o.org||"").includes("DGI")).length});
+  if(obs.some(o=>(o.org||"").includes("BPS")))
+    out.push({org:"bps",label:"BPS",logo:LOGO_BPS,color:C.blue,vto:vtoBPS(period,config?.diaBPS),
+      monto:aportesBPS(client,period,config),n:obs.filter(o=>(o.org||"").includes("BPS")).length});
+  return out;
 }
 
 // ─── INITIAL DATA ─────────────────────────────────────────────────
@@ -229,7 +257,7 @@ const mk=(id,name,entityType,nature,taxes,opts={})=>{
     studyFee:null,studyFeePaid:false,studyFeeDate:null,studyFeeNotes:"",
     billing:{},nominas:{},facturas:{},
     credentials:mkCred(),notes:"",grupoSubgrupo:"",tasks:[],tramites:[],
-    certsDGI,boletos:{},incidencias:[],ivaVentasMes:null,ivaComprasMes:null,ivaFavorAcumulado:0,
+    certsDGI,boletos:{},anticipos:{},obPagos:{},incidencias:[],ivaVentasMes:null,ivaComprasMes:null,ivaFavorAcumulado:0,
     domelMTSS:false,cierreBalance:"",grupoMTSS:"",
     gubAsocBPS:false,gubAsocDGI:false,gubAsocBSE:false,
     ...o};
@@ -239,6 +267,8 @@ const mk=(id,name,entityType,nature,taxes,opts={})=>{
 // Lo de julio (que se hace en agosto) y lo posterior sigue pendiente, como corresponde.
 const AL_DIA_HASTA="2026-07-30";
 const CLEANUP_V="1";
+// Subir esta versión vuelve a aplicar los valores fiscales del año a la config de VC
+const VC_VALORES_V="2026";
 function marcarAlDia(list){
   return (list||[]).map(c=>({...c,tasks:(c.tasks||[]).map(t=>(t.due&&t.due<=AL_DIA_HASTA&&!t.done)?{...t,done:true}:t)}));
 }
@@ -316,13 +346,14 @@ const normClient=(c)=>({
   ...c,
   status:c.status||"activo",
   taxes:{...mkTax(),...(c.taxes||{})},
-  tasks:(Array.isArray(c.tasks)?c.tasks:[]).map(t=>({...t,due:t.due||"",done:!!t.done})),
+  tasks:(Array.isArray(c.tasks)?c.tasks:[]).map(t=>({...t,due:t.due||"",done:!!t.done,cat:t.cat||"otro",freq:t.freq||"otro"})),
   employees:Array.isArray(c.employees)?c.employees:[],
   tramites:Array.isArray(c.tramites)?c.tramites:[],
   certsDGI:Array.isArray(c.certsDGI)?c.certsDGI:[],
   incidencias:Array.isArray(c.incidencias)?c.incidencias:[],
   specialTaxes:Array.isArray(c.specialTaxes)?c.specialTaxes:[],
   nominas:c.nominas||{},sueldos:c.sueldos||{},billing:c.billing||{},facturas:c.facturas||{},boletos:c.boletos||{},
+  anticipos:c.anticipos||{},obPagos:c.obPagos||{},
   credentials:c.credentials||mkCred(),
 });
 const CLIENTS_LASER=marcarAlDia([
@@ -430,6 +461,20 @@ function Pill({label,color=C.gray}){return<span style={{background:color+"15",co
 function Check({checked,onChange,color=C.ok,size=17}){
   return<div onClick={onChange} style={{width:size,height:size,borderRadius:3,border:`1.5px solid ${checked?color:C.border}`,background:checked?color:C.white,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .12s"}}>
     {checked&&<span style={{color:C.white,fontSize:size*.7,lineHeight:1}}>✓</span>}
+  </div>;
+}
+// Tabla o tarjetas: la elección de cada pantalla queda guardada
+function useVista(key,ini="tabla"){
+  const sk=`obligo_vista_${key}`;
+  const [v,setV]=useState(()=>{try{return localStorage.getItem(sk)||ini;}catch(e){return ini;}});
+  useEffect(()=>{try{localStorage.setItem(sk,v);}catch(e){}},[sk,v]);
+  return[v,setV];
+}
+function VistaToggle({v,setV}){
+  return<div style={{display:"flex",border:`1px solid ${C.border}`,borderRadius:7,overflow:"hidden",flexShrink:0}}>
+    {[["tabla","☰","Ver en columnas"],["tarjetas","▦","Ver en tarjetas"]].map(([k,ic,tit])=>(
+      <button key={k} onClick={()=>setV(k)} title={tit} style={{background:v===k?C.blue:C.white,color:v===k?"#fff":C.gray,border:"none",padding:"6px 11px",fontSize:13,cursor:"pointer",fontFamily:F,lineHeight:1}}>{ic}</button>
+    ))}
   </div>;
 }
 function StatCard({label,value,sub,color=C.blue,onClick}){
@@ -571,7 +616,12 @@ function LoginScreen({onLogin}){
       <div style={{marginBottom:20}}><label style={lbl}>Contraseña</label><div style={{position:"relative"}}><input type={show?"text":"password"} value={pass} onChange={e=>setPass(e.target.value)} style={{...inp,borderRadius:9,padding:"10px 50px 10px 11px"}} onKeyDown={e=>e.key==="Enter"&&login()}/><button onClick={()=>setShow(p=>!p)} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",cursor:"pointer",fontSize:11,color:C.gray,fontFamily:F}}>{show?"Ocultar":"Ver"}</button></div></div>
       {err&&<div style={{color:C.red,fontSize:12,marginBottom:12}}>{err}</div>}
       <button onClick={login} style={{width:"100%",background:"linear-gradient(135deg,#14294F,#1E3A6B)",color:VC_GOLD_LIGHT,border:"none",borderRadius:10,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:F,letterSpacing:.4,boxShadow:"0 6px 18px #14294f55"}}>Ingresar</button>
-      <div style={{marginTop:16,paddingTop:12,borderTop:`1px solid ${C.border}`,fontSize:10,color:C.gray,textAlign:"center",fontFamily:F,letterSpacing:.3}}>Obligo · Gestión contable · Montevideo, Uruguay</div>
+      <div style={{marginTop:16,paddingTop:12,borderTop:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>
+        <img src={LOGO_OBLIGO} alt="" style={{width:19,height:19}}/>
+        <div style={{fontSize:10.5,color:C.gray,fontFamily:F,letterSpacing:.3,lineHeight:1.3,textAlign:"left"}}>
+          <b style={{color:C.navy,fontWeight:800,letterSpacing:0}}>Obligo</b> · Gestión contable<br/>Montevideo, Uruguay
+        </div>
+      </div>
     </div>
   </div>;
 }
@@ -621,6 +671,10 @@ function Sidebar({view,setView,user,onLogout}){
           <div style={{fontSize:11,color:"#6B8FC0",fontFamily:F}}>{user.name}</div>
           <div style={{fontSize:10,color:"#4B6FA8",fontFamily:F,marginBottom:5}}>{user.role==="admin"?"Administrador":user.role==="secretaria"?"Secretaria":"Auxiliar Contable"}</div>
           <button onClick={onLogout} style={{fontSize:10,color:"#4B6FA8",background:"transparent",border:"none",cursor:"pointer",fontFamily:F,padding:0}}>Cerrar sesión</button>
+        </div>
+        <div style={{marginTop:9,display:"flex",alignItems:"center",justifyContent:"center",gap:6,opacity:.62}}>
+          <img src={LOGO_OBLIGO} alt="" style={{width:15,height:15}}/>
+          <span style={{fontSize:10,color:"#8FA8CE",fontFamily:F,letterSpacing:.4}}>Funciona con <b style={{color:"#C9DBF2",fontWeight:700}}>Obligo</b></span>
         </div>
       </div>
     </div>
@@ -756,8 +810,18 @@ function ProveedoresPanel({proveedores,setProveedores,period,user}){
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────
-function Dashboard({clients,setClients,setView,openClient,user,proveedores,setProveedores,period,setPeriod}){
+function Dashboard({clients,setClients,setView,openClient,user,proveedores,setProveedores,period,setPeriod,config}){
   const {m}=useR();
+  const [buscaOb,setBuscaOb]=useState("");
+  const [soloPend,setSoloPend]=useState(false);
+  // Una línea por cliente con lo que debe a DGI y a BPS este mes
+  const lineas=useMemo(()=>clients.filter(c=>c.status!=="inactivo").map(c=>({c,items:resumenMes(c,period,config)})),[clients,period,config]);
+  const pagado=(c,org)=>!!c.boletos?.[period]?.[org]?.pagado;
+  const togglePago=(cid,org)=>setClients(prev=>prev.map(c=>{
+    if(c.id!==cid)return c;
+    const per=c.boletos?.[period]||{};const b=per[org]||{};
+    return{...c,boletos:{...c.boletos,[period]:{...per,[org]:{...b,pagado:!b.pagado}}}};
+  }));
   const sinConf=clients.filter(c=>!isConf(c)).length;
   const conEmp=clients.filter(c=>c.hasEmployees).length;
   const venc=clients.flatMap(c=>c.tasks).filter(t=>!t.done&&t.due<TODAY).length;
@@ -814,27 +878,8 @@ function Dashboard({clients,setClients,setView,openClient,user,proveedores,setPr
       </div>
     </div>}
 
-    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-      <div style={{background:C.white,borderRadius:8,padding:14,boxShadow:"0 1px 3px #0001"}}>
-        <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:10,display:"flex",alignItems:"center",gap:7,fontFamily:F}}>
-          <Logo src={LOGO_DGI} size={15}/>Vencimientos DGI — {vtoDGI(period)}
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto"}}>
-          {clients.filter(c=>isConf(c)).flatMap(c=>getObs(c,period).filter(o=>o.freq==="mensual"&&o.org?.includes("DGI")).map(o=>({client:c,ob:o}))).slice(0,12).map((p,i)=>(
-            <div key={i} onClick={()=>openClient(p.client.id)} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 8px",borderRadius:5,background:C.bg,cursor:"pointer",border:`1px solid ${C.border}`}}>
-              <Avatar name={p.client.name} taxes={p.client.taxes} size={22}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:12,fontWeight:600,color:C.navy,fontFamily:F,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.client.name}</div>
-                <div style={{fontSize:11,color:C.gray,fontFamily:F,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.ob.label}</div>
-              </div>
-              {p.ob.url&&<button onClick={e=>{e.stopPropagation();openUrl(EXT[p.ob.url]);}} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:3,padding:"1px 5px",fontSize:10,cursor:"pointer",color:C.blue,fontFamily:F}}>↗</button>}
-            </div>
-          ))}
-          {clients.filter(c=>isConf(c)).flatMap(c=>getObs(c,period).filter(o=>o.freq==="mensual"&&o.org?.includes("DGI"))).length===0&&<div style={{color:C.gray,fontSize:12,textAlign:"center",padding:14,fontFamily:F}}>Sin vencimientos</div>}
-        </div>
-      </div>
-
-      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+    <div style={{display:"grid",gridTemplateColumns:m?"1fr":"1fr 1fr",gap:12,marginBottom:14,alignItems:"start"}}>
+      <div style={{display:"contents"}}>
         <div style={{background:C.white,borderRadius:8,padding:14,boxShadow:"0 1px 3px #0001"}}>
           <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:8,fontFamily:F}}>Tareas vencidas</div>
           {overdueByClient.length===0?<div style={{color:C.ok,fontSize:12,fontFamily:F}}>Sin tareas vencidas</div>
@@ -868,27 +913,67 @@ function Dashboard({clients,setClients,setView,openClient,user,proveedores,setPr
       <ProveedoresPanel proveedores={proveedores} setProveedores={setProveedores} period={period} user={user}/>
     </div>}
 
-    {/* Grilla todos los clientes - colores alternos celeste */}
-    <div style={{background:C.white,borderRadius:8,padding:14,boxShadow:"0 1px 3px #0001"}}>
-      <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:10,fontFamily:F}}>Todos los clientes</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(155px,1fr))",gap:6}}>
-        {clients.map((c,i)=>(
-          <div key={c.id} onClick={()=>openClient(c.id)} style={{padding:"8px 10px",border:`1px solid ${i%2===0?"#B8D9F5":"#8EC4EE"}`,borderRadius:7,cursor:"pointer",background:i%2===0?C.cell1:C.cell2,opacity:c.status==="inactivo"?.7:1,transition:"filter .1s"}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-              <Avatar name={c.name} taxes={c.taxes} size={22}/>
-              <div style={{fontSize:12,fontWeight:600,color:C.navy,fontFamily:F,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{c.name}</div>
-            </div>
-            {c.specialTag?<SpecialTag tag={c.specialTag} size={9}/>:<TBadge taxes={c.taxes}/>}
-            {c.status==="inactivo"&&<div style={{fontSize:10,color:C.gray,fontFamily:F,marginTop:3}}>Inactivo</div>}
+    {/* Una línea por cliente: DGI y BPS, importe, vencimiento y casilla para tachar */}
+    {(()=>{
+      const q=buscaOb.trim().toLowerCase();
+      const vis=lineas.filter(({c,items})=>{
+        if(q&&!c.name.toLowerCase().includes(q)&&!(c.giro||"").toLowerCase().includes(q))return false;
+        if(soloPend)return items.some(it=>!pagado(c,it.org));
+        return true;
+      });
+      const pend=lineas.reduce((a,{c,items})=>a+items.filter(it=>!pagado(c,it.org)).length,0);
+      const totalPend=lineas.reduce((a,{c,items})=>a+items.filter(it=>!pagado(c,it.org)).reduce((x,it)=>x+it.monto,0),0);
+      return<div style={{background:C.white,borderRadius:8,padding:14,boxShadow:"0 1px 3px #0001"}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:4,flexWrap:"wrap"}}>
+          <div style={{width:4,height:15,background:C.blue,borderRadius:2}}/>
+          <span style={{fontWeight:700,color:C.navy,fontSize:14,fontFamily:F}}>Obligaciones de {periodoLargo(period)}</span>
+          <span style={{fontSize:11.5,color:C.gray,fontFamily:F}}>se pagan en {periodoLargo(nextP(period))}</span>
+          <div style={{marginLeft:"auto",display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
+            <input value={buscaOb} onChange={e=>setBuscaOb(e.target.value)} placeholder="Buscar cliente…" style={{...inp,width:m?130:170,padding:"5px 9px",fontSize:12}}/>
+            <button onClick={()=>setSoloPend(p=>!p)} style={{padding:"5px 12px",borderRadius:99,border:`1.5px solid ${soloPend?C.warn:C.border}`,background:soloPend?C.warn:"transparent",color:soloPend?"#fff":C.gray,fontSize:11.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>Sólo pendientes</button>
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+        <div style={{fontSize:11.5,color:C.gray,fontFamily:F,marginBottom:10}}>
+          {pend===0?<span style={{color:C.ok,fontWeight:600}}>Todo marcado como pagado este mes.</span>
+            :<>Quedan <b style={{color:C.navy}}>{pend}</b> boleto{pend!==1?"s":""} sin marcar{totalPend>0?<> por <b style={{color:C.navy}}>$ {fU(totalPend,0)}</b></>:null}. Tildá la casilla para tacharlo.</>}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          {vis.map(({c,items})=>{
+            const todo=items.length>0&&items.every(it=>pagado(c,it.org));
+            return<div key={c.id} style={{display:"flex",alignItems:"center",gap:9,padding:"7px 10px",borderRadius:8,border:`1px solid ${todo?C.ok+"40":C.border}`,background:todo?C.ok+"08":C.white,flexWrap:"wrap"}}>
+              <Avatar name={c.name} taxes={c.taxes} size={26}/>
+              <div onClick={()=>openClient(c.id)} style={{flex:1,minWidth:145,cursor:"pointer"}}>
+                <div style={{fontSize:12.5,fontWeight:600,fontFamily:F,color:todo?C.gray:C.navy,textDecoration:todo?"line-through":"none",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
+                <div style={{fontSize:10.5,color:C.gray,fontFamily:F,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.giro||"–"}</div>
+              </div>
+              {items.map(it=>{const ok=pagado(c,it.org);const vencido=!ok&&vtoISO(it.vto)&&vtoISO(it.vto)<TODAY;
+                return<div key={it.org} onClick={()=>togglePago(c.id,it.org)} title={ok?"Marcado como pagado":`Vence el ${it.vto}`}
+                  style={{display:"flex",alignItems:"center",gap:8,padding:"5px 9px",borderRadius:8,cursor:"pointer",minWidth:168,
+                    border:`1px solid ${ok?C.ok+"55":vencido?C.red+"55":it.color+"33"}`,background:ok?C.ok+"0d":vencido?C.red+"08":it.color+"07"}}>
+                  <LogoRaw src={it.logo} size={22}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:11.5,fontWeight:700,fontFamily:F,color:ok?C.gray:it.color,textDecoration:ok?"line-through":"none"}}>
+                      {it.monto>0?`$ ${fU(it.monto,0)}`:it.label}
+                    </div>
+                    <div style={{fontSize:10,fontFamily:F,color:ok?C.gray:vencido?C.red:C.gray,textDecoration:ok?"line-through":"none",fontWeight:vencido?700:400}}>
+                      {ok?"Pagado":vencido?`Venció el ${it.vto}`:`Vence ${it.vto}`}
+                    </div>
+                  </div>
+                  <Check checked={ok} onChange={()=>{}} color={C.ok}/>
+                </div>;})}
+              {items.length===0&&<span style={{fontSize:11,color:C.gray,fontFamily:F,fontStyle:"italic"}}>{isConf(c)?"Sin obligaciones mensuales":"Sin configurar"}</span>}
+            </div>;
+          })}
+          {vis.length===0&&<div style={{padding:22,textAlign:"center",color:C.gray,fontSize:12,fontFamily:F}}>Sin clientes para mostrar</div>}
+        </div>
+      </div>;
+    })()}
   </div>;
 }
 
 // ─── TASKS MODULE ─────────────────────────────────────────────────
 function TasksModule({clients,setClients,period,user}){
+  const [vista,setVista]=useVista("tareas");
   const [filterFreq,setFilterFreq]=useState("all");
   const [filterStatus,setFilterStatus]=useState("pending");
   const [filterCat,setFilterCat]=useState("all");
@@ -918,7 +1003,10 @@ function TasksModule({clients,setClients,period,user}){
   return<div style={{padding:22}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
       <h1 style={{margin:0,fontSize:19,fontWeight:700,color:C.navy,fontFamily:F}}>Tareas — {period}</h1>
-      <button onClick={()=>setAddingGlobal(true)} style={{background:C.blue,color:C.white,border:"none",borderRadius:6,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F}}>+ Nueva tarea</button>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <VistaToggle v={vista} setV={setVista}/>
+        <button onClick={()=>setAddingGlobal(true)} style={{background:C.blue,color:C.white,border:"none",borderRadius:6,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F}}>+ Nueva tarea</button>
+      </div>
     </div>
     {addingGlobal&&<div style={{background:C.white,borderRadius:8,padding:14,border:`1px solid ${C.blue}40`,marginBottom:14,boxShadow:"0 1px 3px #0001"}}>
       <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:10,fontFamily:F}}>Nueva tarea</div>
@@ -949,7 +1037,26 @@ function TasksModule({clients,setClients,period,user}){
         </select>
       </div>
     </div>
-    <div style={{background:C.white,borderRadius:8,boxShadow:"0 1px 3px #0001",overflow:"hidden"}}>
+    {vista==="tarjetas"?(filtered.length===0
+      ?<div style={{background:C.white,borderRadius:8,padding:20,textAlign:"center",color:C.gray,fontSize:13,fontFamily:F}}>Sin tareas que coincidan</div>
+      :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:10}}>
+        {filtered.map(t=>{const isOverdue=t.due<TODAY&&!t.done;const col=t.cat==="dgi"?C.red:t.cat==="bps"?C.blue:C.gray;
+          return<div key={`${t.clientId}-${t.id}`} style={{background:C.white,borderRadius:10,padding:12,boxShadow:"0 1px 3px #0001",border:`1px solid ${t.done?C.ok+"35":isOverdue?C.red+"45":C.border}`,display:"flex",flexDirection:"column",gap:8,opacity:t.done?.75:1}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:8}}>
+              <Check checked={t.done} onChange={()=>toggle(t.clientId,t.id)} color={C.ok}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:12.5,fontWeight:700,color:t.done?C.gray:C.navy,fontFamily:F,textDecoration:t.done?"line-through":"none",lineHeight:1.35}}>{t.label}</div>
+                <div style={{fontSize:11,color:C.gray,fontFamily:F,marginTop:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.clientName}</div>
+              </div>
+            </div>
+            {t.assignedTo&&<div style={{fontSize:10,background:"#E0E7FF",color:"#3730A3",padding:"2px 7px",borderRadius:4,fontFamily:F,alignSelf:"flex-start"}}>→ {USERS.find(u=>u.id===t.assignedTo)?.name||t.assignedTo}</div>}
+            <div style={{marginTop:"auto",paddingTop:7,borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:9.5,background:col+"15",color:col,padding:"2px 7px",borderRadius:4,fontFamily:F,fontWeight:700}}>{(t.cat||"otro").toUpperCase()}</span>
+              <span style={{fontSize:11,fontFamily:F,color:isOverdue?C.red:t.done?C.ok:C.gray,fontWeight:isOverdue?700:400}}>{isOverdue?"Venció ":""}{t.due||"sin fecha"}</span>
+            </div>
+          </div>;})}
+      </div>)
+    :<div style={{background:C.white,borderRadius:8,boxShadow:"0 1px 3px #0001",overflow:"hidden"}}>
       {filtered.length===0?<div style={{padding:20,textAlign:"center",color:C.gray,fontSize:13,fontFamily:F}}>Sin tareas que coincidan</div>
         :<div style={{display:"flex",flexDirection:"column",gap:1}}>
           {filtered.map((t,i)=>{const due=new Date(t.due),isOverdue=t.due<TODAY;return<div key={`${t.clientId}-${t.id}`} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderBottom:i<filtered.length-1?`1px solid ${C.border}`:"none",background:t.done?"#F5F5F5":isOverdue?"#FEF2F2":C.white}}>
@@ -960,11 +1067,11 @@ function TasksModule({clients,setClients,period,user}){
             </div>
             <div style={{display:"flex",gap:6,alignItems:"center"}}>
               <span style={{fontSize:11,fontFamily:F,color:isOverdue&&!t.done?C.red:t.done?C.ok:C.gray,fontWeight:isOverdue&&!t.done?600:400,whiteSpace:"nowrap"}}>{t.due}</span>
-              <span style={{fontSize:9,background:t.cat==="dgi"?C.blue+"15":t.cat==="bps"?"#1F299E15":"#9CA3AF30",color:t.cat==="dgi"?C.blue:t.cat==="bps"?"#1F299E":C.gray,padding:"2px 6px",borderRadius:3,fontFamily:F,fontWeight:500}}>{t.cat.toUpperCase()}</span>
+              <span style={{fontSize:9,background:t.cat==="dgi"?C.blue+"15":t.cat==="bps"?"#1F299E15":"#9CA3AF30",color:t.cat==="dgi"?C.blue:t.cat==="bps"?"#1F299E":C.gray,padding:"2px 6px",borderRadius:3,fontFamily:F,fontWeight:500}}>{(t.cat||"otro").toUpperCase()}</span>
             </div>
           </div>;})}
         </div>}
-    </div>
+    </div>}
   </div>;
 }
 
@@ -1009,10 +1116,12 @@ function AlertsCenter({clients}){
 }
 
 // ─── CLIENT LIST ──────────────────────────────────────────────────
-function ClientList({clients,openClient,onNew}){
+function ClientList({clients,openClient,onNew,period,config}){
   const {m:clM}=useR();
   const [search,setSearch]=useState("");const[showModal,setShowModal]=useState(false);const[sf,setSf]=useState("activo");
   const [tf,setTf]=useState("all");
+  const [vista,setVista]=useVista("clientes");
+  const [showRep,setShowRep]=useState(false);
   const filtered=useMemo(()=>clients.filter(c=>{
     if(sf!=="all"&&c.status!==sf)return false;
     const q=search.toLowerCase();
@@ -1022,9 +1131,14 @@ function ClientList({clients,openClient,onNew}){
   const conteo=useMemo(()=>{const o={};TAX_FILTERS.forEach(([k])=>{o[k]=clients.filter(c=>(sf==="all"||c.status===sf)&&matchTaxFilter(c,k)).length;});return o;},[clients,sf]);
   return<div style={{padding:clM?12:22}}>
     {showModal&&<NewClientModal onClose={()=>setShowModal(false)} onSave={onNew}/>}
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+    {showRep&&<ReporteModal clients={clients} initialIds={[]} period={period||PINIT} config={config||{}} onClose={()=>setShowRep(false)}/>}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,gap:8,flexWrap:"wrap"}}>
       <h1 style={{margin:0,fontSize:19,fontWeight:700,color:C.navy,fontFamily:F}}>Clientes <span style={{fontSize:13,color:C.gray,fontWeight:400}}>({clients.length})</span></h1>
-      <button onClick={()=>setShowModal(true)} style={{background:C.blue,color:C.white,border:"none",borderRadius:6,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F}}>+ Nuevo cliente</button>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <VistaToggle v={vista} setV={setVista}/>
+        <button onClick={()=>setShowRep(true)} title="Armar un reporte con una o varias empresas" style={{background:"transparent",color:C.navy,border:`1px solid ${C.border}`,borderRadius:6,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F}}>📄 Reporte</button>
+        <button onClick={()=>setShowModal(true)} style={{background:C.blue,color:C.white,border:"none",borderRadius:6,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F}}>+ Nuevo cliente</button>
+      </div>
     </div>
     <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar por nombre, giro, RUT o Nº BPS..." style={{...inp,flex:1,minWidth:200,maxWidth:340}}/>
@@ -1040,7 +1154,30 @@ function ClientList({clients,openClient,onNew}){
       {TAX_QUICK.map(([k,l,col])=>{const n=conteo[k]||0;const on=tf===k;return<button key={k} onClick={()=>setTf(on?"all":k)} disabled={n===0&&!on} style={{padding:"4px 11px",borderRadius:99,border:`1.5px solid ${on?col:col+"40"}`,background:on?col:col+"0f",color:on?"#fff":n===0?C.gray:col,fontSize:11.5,fontWeight:700,cursor:n===0&&!on?"default":"pointer",fontFamily:F,opacity:n===0&&!on?.45:1}}>{l} · {n}</button>;})}
     </div>
     <div style={{fontSize:12,color:C.gray,fontFamily:F,marginBottom:8}}>Mostrando <b style={{color:C.navy}}>{filtered.length}</b> de {clients.length} clientes{tf!=="all"?` · filtro: ${(TAX_FILTERS.find(f=>f[0]===tf)||[])[1]}`:""}</div>
-    <div style={{background:C.white,borderRadius:8,boxShadow:"0 1px 3px #0001",overflow:"hidden"}}>
+    {vista==="tarjetas"?<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(238px,1fr))",gap:10}}>
+      {filtered.map(c=>{const pen=c.tasks.filter(t=>!t.done).length,ov=c.tasks.filter(t=>!t.done&&t.due<TODAY).length;
+        return<div key={c.id} onClick={()=>openClient(c.id)} style={{background:C.white,borderRadius:10,padding:13,cursor:"pointer",border:`1px solid ${ov>0?C.red+"40":C.border}`,boxShadow:"0 1px 3px #0001",opacity:c.status==="inactivo"?.65:1,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:9}}>
+            <Avatar name={c.name} taxes={c.taxes} size={36}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:700,color:C.navy,fontFamily:F,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</div>
+              <div style={{fontSize:11,color:C.gray,fontFamily:F,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.giro||"–"}</div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{c.specialTag?<SpecialTag tag={c.specialTag}/>:<TBadge taxes={c.taxes}/>}</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            <Pill label={ENTITY[c.entityType]||c.entityType} color={C.navy}/>
+            <Pill label={NATURE[c.nature]||c.nature} color={C.teal}/>
+            {c.hasEmployees&&<Pill label={`${(c.employees||[]).length} emp.`} color={C.blue}/>}
+          </div>
+          <div style={{marginTop:"auto",paddingTop:7,borderTop:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11.5,fontFamily:F}}>
+            {ov>0?<span style={{color:C.red,fontWeight:700}}>{ov} vencida{ov!==1?"s":""}</span>:<span style={{color:C.gray}}>{pen} pendiente{pen!==1?"s":""}</span>}
+            {c.rut&&<span style={{color:C.gray,fontSize:10.5}}>RUT {c.rut}</span>}
+          </div>
+        </div>;})}
+      {filtered.length===0&&<div style={{gridColumn:"1/-1",padding:28,textAlign:"center",color:C.gray,fontFamily:F,background:C.white,borderRadius:8}}>Sin resultados</div>}
+    </div>
+    :<div style={{background:C.white,borderRadius:8,boxShadow:"0 1px 3px #0001",overflow:"hidden"}}>
       <div style={{overflowX:"auto"}}>
       <div style={{display:"grid",gridTemplateColumns:"2.5fr 1fr 1fr 1fr 80px",background:C.navy,padding:"8px 14px",minWidth:520}}>
         {["Cliente","Impuestos","Tipo","Naturaleza","Tareas"].map(h=><div key={h} style={{color:"#EFF0F4",fontSize:11,fontWeight:600,fontFamily:F}}>{h}</div>)}
@@ -1052,7 +1189,7 @@ function ClientList({clients,openClient,onNew}){
       </div>;})}
       {filtered.length===0&&<div style={{padding:28,textAlign:"center",color:C.gray,fontFamily:F}}>Sin resultados</div>}
       </div>
-    </div>
+    </div>}
   </div>;
 }
 
@@ -1563,25 +1700,34 @@ function buildLineasEmpresa(c,period,config){
   const dgiDue=`${String(config?.diaDGI||22).padStart(2,"0")}/${nextP(period)}`;
   const bpsDue=`${String(config?.diaBPS||10).padStart(2,"0")}/${nextP(period)}`;
   const calc=calcAnticipos(c,period,config);
-  if(t.iva==="minimo")lines.push({org:"DGI",label:"IVA Mínimo (Literal E) — Form. 2908",due:dgiDue,amount:config?.ivaMinimo||null});
-  if(t.iva==="basica"||t.iva==="reducida")lines.push({org:"DGI",label:`IVA ${t.iva==="basica"?"tasa básica 22%":"tasa reducida 10%"} — DJ 2178`+(calc.excedente>0?` (mes sin pago, excedente de $ ${fU(calc.excedente,2)})`:""),due:dgiDue,amount:calc.cargado?calc.pagoIVA:null});
+  // Los importes salen del mismo boleto 2908 que ve el estudio, con los ajustes a mano incluidos
+  const b2908=calc2908(c,config,period);
+  const mt=(k)=>{const it=b2908.items.find(i=>i.key===k);return it?it.monto:null;};
+  if(t.iva==="minimo")lines.push({org:"DGI",label:"IVA Mínimo (Literal E) — Form. 2908",due:dgiDue,amount:mt("ivaMin")});
+  if(t.iva==="basica"||t.iva==="reducida")lines.push({org:"DGI",label:`IVA ${t.iva==="basica"?"tasa básica 22%":"tasa reducida 10%"} — DJ 2178`+(calc.excedente>0?` (mes sin pago, excedente de $ ${fU(calc.excedente,2)})`:""),due:dgiDue,amount:calc.cargado?mt("iva"):null});
   if(t.iva==="sp")lines.push({org:"DGI",label:"IVA Servicios Personales — Form. 1302",due:dgiDue,amount:null});
   if(t.iva==="monotributo")lines.push({org:"BPS",label:"Cuota Monotributo unificada",due:bpsDue,amount:null});
-  if(t.renta==="irae")lines.push({org:"DGI",label:`Anticipo IRAE${t.iraeEsFicto?" (régimen ficto)":""}`,due:dgiDue,amount:calc.irae||t.iraeMontoMensual||null});
+  if(t.renta==="irae")lines.push({org:"DGI",label:`Anticipo IRAE${t.iraeEsFicto?" (régimen ficto)":""}`,due:dgiDue,amount:mt("irae")});
   if(t.renta==="irpf_cat2")lines.push({org:"DGI",label:"Anticipo IRPF Cat. II / FONASA serv. personales",due:dgiDue,amount:null});
-  if(t.patrimonio)lines.push({org:"DGI",label:"Anticipo Impuesto al Patrimonio",due:dgiDue,amount:t.ipAnticipoMensual||null});
+  if(t.patrimonio)lines.push({org:"DGI",label:"Anticipo Impuesto al Patrimonio",due:dgiDue,amount:mt("ip")});
+  if(c.entityType==="sa")lines.push({org:"DGI",label:"ICOSA mensual",due:dgiDue,amount:mt("icosa")});
   if(c.hasEmployees&&(c.employees||[]).length){
-    const inc=(c.sueldos||{})[period]||{};
-    const opts={period,bpc:config?.bpc||6864,antigTope:c.antigTope!=null?c.antigTope:null};
-    const tot=(c.employees||[]).reduce((a,e)=>a+calcRecibo(e,inc[e.id]||{},opts).aportes,0);
-    lines.push({org:"BPS",label:`Aportes BPS nómina (${(c.employees||[]).length} empleado${(c.employees||[]).length!==1?"s":""}, según liquidación)`,due:bpsDue,amount:tot>0?Math.round(tot):null});
+    const tot=aportesBPS(c,period,config);
+    lines.push({org:"BPS",label:`Aportes BPS nómina (${(c.employees||[]).length} empleado${(c.employees||[]).length!==1?"s":""}, según liquidación)`,due:bpsDue,amount:tot>0?tot:null});
   }
   if(c.entityType==="sas"||c.entityType==="sa")lines.push({org:"BPS",label:"FONASA director/a titular",due:bpsDue,amount:null});
   if(c.efactura==="activo")lines.push({org:"DGI",label:"Facturación electrónica: emisor activo — sin pago, control de CFE al día",due:"",amount:null});
   if(c.efactura==="pendiente")lines.push({org:"DGI",label:"Facturación electrónica: ALTA PENDIENTE de gestionar",due:"",amount:null});
   return lines;
 }
+// Identidad del estudio activo, para que el PDF salga con la marca que corresponde
+function marcaEstudio(){
+  return ACTIVE_STUDIO==="laser"
+    ?{nombre:"Laser Solutions",logo:LOGO_LASER_FULL,logoW:185,navy:"#021942",acento:"#2948D9",suave:"#8ECBDE",fondo:"#F1F5FB",borde:"#D8E2F2",grad:"linear-gradient(100deg,#021942,#0A2B66)",lema:"Gestión contable"}
+    :{nombre:"Estudio Valeria Calvette",logo:LOGO_VC,logoW:78,navy:VC_NAVY,acento:"#8A6A1F",suave:VC_GOLD_LIGHT,fondo:"#FBF8F1",borde:"#E7DCC2",grad:"linear-gradient(100deg,#14294F,#24427C)",lema:"Normativa clara. Decisiones seguras."};
+}
 function generarReportePDF(empresas,period,config,notaGeneral){
+  const B=marcaEstudio();
   const tot=empresas.reduce((a,e)=>a+e.lines.reduce((x,l)=>x+(+l.amount||0),0),0);
   const orgColor={DGI:"#B91C1C",BPS:"#1D4ED8",BSE:"#B45309",Otro:"#475569"};
   const secciones=empresas.map(({client,lines,nota})=>{
@@ -1602,39 +1748,47 @@ function generarReportePDF(empresas,period,config,notaGeneral){
   }).join("");
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>Reporte ${periodoLargo(period)}</title><style>
     *{box-sizing:border-box}body{font-family:Inter,'Segoe UI',Arial,sans-serif;margin:0;padding:26px 30px;color:#0b1530;font-size:11.5px;background:#fff}
-    .head{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #021942;padding-bottom:14px;margin-bottom:6px}
-    .head img{width:185px}
+    .head{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid ${B.navy};padding-bottom:14px;margin-bottom:6px}
+    .head .marca{display:flex;align-items:center;gap:11px}
+    .head img{width:${B.logoW}px}
+    .head .mn{font-size:15px;font-weight:800;color:${B.navy};line-height:1.2}
+    .head .ml{font-size:9.5px;color:${B.acento};font-weight:600;margin-top:2px}
     .head .tit{text-align:right}
-    .head .t1{font-size:19px;font-weight:800;color:#021942}
-    .head .t2{font-size:12.5px;color:#2948D9;font-weight:700;margin-top:2px}
+    .head .t1{font-size:19px;font-weight:800;color:${B.navy}}
+    .head .t2{font-size:12.5px;color:${B.acento};font-weight:700;margin-top:2px}
     .intro{font-size:10.5px;color:#5B6B8C;margin:10px 0 16px}
     .empresa{margin-bottom:20px;page-break-inside:avoid}
-    .emp-head{background:linear-gradient(100deg,#021942,#0A2B66);border-radius:8px 8px 0 0;padding:8px 13px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+    .emp-head{background:${B.grad};border-radius:8px 8px 0 0;padding:8px 13px;display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
     .emp-nom{color:#fff;font-weight:800;font-size:13.5px}
-    .emp-meta{color:#8ECBDE;font-size:10px;font-weight:600}
-    table{width:100%;border-collapse:collapse;border:1px solid #D8E2F2;border-top:none}
-    th{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#7a87a6;text-align:left;padding:6px 10px;background:#F1F5FB;border-bottom:1px solid #D8E2F2}
+    .emp-meta{color:${B.suave};font-size:10px;font-weight:600}
+    table{width:100%;border-collapse:collapse;border:1px solid ${B.borde};border-top:none}
+    th{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#7a87a6;text-align:left;padding:6px 10px;background:${B.fondo};border-bottom:1px solid ${B.borde}}
     td{padding:6.5px 10px;border-bottom:1px solid #EDF1F9;vertical-align:middle}
     .org{display:inline-block;border:1px solid;border-radius:99px;padding:1px 9px;font-size:9.5px;font-weight:800}
     .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
-    tfoot td{background:#F1F5FB;font-weight:800;color:#021942;border-top:2px solid #021942}
+    tfoot td{background:${B.fondo};font-weight:800;color:${B.navy};border-top:2px solid ${B.navy}}
     .nota{background:#FFFBEB;border:1px solid #FDE68A;border-radius:0 0 8px 8px;padding:7px 11px;font-size:10.5px;color:#78350F}
-    .grantotal{background:#021942;color:#fff;border-radius:10px;padding:13px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+    .grantotal{background:${B.navy};color:#fff;border-radius:10px;padding:13px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:6px}
     .grantotal .gt1{font-size:12px;font-weight:700;letter-spacing:.5px}
-    .grantotal .gt2{font-size:19px;font-weight:800;color:#8ECBDE}
-    .notagen{margin-top:14px;background:#F1F5FB;border-radius:8px;padding:10px 13px;font-size:11px;color:#33405e}
-    .foot{margin-top:26px;border-top:1px solid #D8E2F2;padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:9.5px;color:#7a87a6}
+    .grantotal .gt2{font-size:19px;font-weight:800;color:${B.suave}}
+    .notagen{margin-top:14px;background:${B.fondo};border-radius:8px;padding:10px 13px;font-size:11px;color:#33405e}
+    .foot{margin-top:26px;border-top:1px solid ${B.borde};padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:9.5px;color:#7a87a6}
+    .foot .obligo{display:flex;align-items:center;gap:5px;opacity:.75}
+    .foot .obligo img{width:13px}
     @media print{body{padding:12px 14px}}
   </style></head><body>
     <div class="head">
-      <img src="${LOGO_LASER_FULL}" alt="Laser Solutions"/>
+      <div class="marca">
+        <img src="${B.logo}" alt="${B.nombre}"/>
+        ${ACTIVE_STUDIO==="laser"?"":`<div><div class="mn">${B.nombre}</div><div class="ml">${B.lema}</div></div>`}
+      </div>
       <div class="tit"><div class="t1">Resumen de obligaciones</div><div class="t2">${periodoLargo(period)}</div></div>
     </div>
-    <div class="intro">Detalle de obligaciones tributarias y de seguridad social del período, preparado por Laser Solutions.${empresas.length>1?` Incluye ${empresas.length} empresas del grupo.`:""}</div>
+    <div class="intro">Detalle de obligaciones tributarias y de seguridad social del período, preparado por ${B.nombre}.${empresas.length>1?` Incluye ${empresas.length} empresas del grupo, con el detalle de cada una por separado.`:""}</div>
     ${secciones}
     <div class="grantotal"><div class="gt1">TOTAL A PREVER DEL PERÍODO${empresas.length>1?" (todas las empresas)":""}</div><div class="gt2">$ ${fU(tot,2)}</div></div>
     ${notaGeneral?`<div class="notagen"><b>Notas:</b> ${notaGeneral}</div>`:""}
-    <div class="foot"><span>Laser Solutions · Gestión contable · ${config?.studioEmail||""}</span><span>Generado el ${TODAY.split("-").reverse().join("/")}</span></div>
+    <div class="foot"><span>${B.nombre}${config?.studioEmail?` · ${config.studioEmail}`:""} · Generado el ${TODAY.split("-").reverse().join("/")}</span><span class="obligo"><img src="${LOGO_OBLIGO}" alt=""/>Hecho con Obligo</span></div>
     <script>window.onload=function(){setTimeout(function(){window.print();},400);};</script>
   </body></html>`;
   const w=window.open("","_blank","width=940,height=760");
@@ -1659,12 +1813,12 @@ function ReporteModal({clients,initialIds,period,config,onClose}){
   };
   return<div style={{position:"fixed",inset:0,background:"#021029a8",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:rpM?8:24}} onClick={onClose}>
     <div onClick={e=>e.stopPropagation()} style={{background:C.white,borderRadius:14,width:760,maxWidth:"100%",maxHeight:"92vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 24px 80px #00081f80"}}>
-      <div style={{background:"linear-gradient(110deg,#021029,#021942 60%,#0A2B66)",padding:"13px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+      <div style={{background:ACTIVE_STUDIO==="laser"?"linear-gradient(110deg,#021029,#021942 60%,#0A2B66)":"linear-gradient(110deg,#08152B,#14294F 60%,#24427C)",padding:"13px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div>
           <div style={{color:"#fff",fontWeight:800,fontSize:15,fontFamily:F}}>📄 Reporte para el cliente — {periodoLargo(period)}</div>
-          <div style={{color:"#8ECBDE",fontSize:11,fontFamily:F,marginTop:2}}>Elegí las empresas, ajustá montos y generá el PDF con la estética Laser Solutions.</div>
+          <div style={{color:ACTIVE_STUDIO==="laser"?"#8ECBDE":VC_GOLD_LIGHT,fontSize:11,fontFamily:F,marginTop:2}}>Elegí una o varias empresas, ajustá los montos y salí con el PDF de {marcaEstudio().nombre}.</div>
         </div>
-        <button onClick={onClose} style={{background:"#ffffff14",border:"1px solid #ffffff25",color:"#8ECBDE",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:15}}>✕</button>
+        <button onClick={onClose} style={{background:"#ffffff14",border:"1px solid #ffffff25",color:ACTIVE_STUDIO==="laser"?"#8ECBDE":VC_GOLD_LIGHT,borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:15}}>✕</button>
       </div>
       <div style={{padding:"12px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",gap:6,flexWrap:"wrap"}}>
         {clients.filter(c=>c.status!=="inactivo").map(c=><button key={c.id} onClick={()=>toggle(c)} style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${sel[c.id]?C.blue:C.border}`,background:sel[c.id]?C.blue:"transparent",color:sel[c.id]?"#fff":C.gray,fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:F}}>{sel[c.id]?"✓ ":""}{c.name}</button>)}
@@ -1812,7 +1966,6 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
   const [showReporte,setShowReporte]=useState(false);
   const [certPagoIdx,setCertPagoIdx]=useState(-1);
   const [certPagoMonto,setCertPagoMonto]=useState("");
-  const [obState,setObState]=useState({});
   const [addingTask,setAddingTask]=useState(false);
   const [newTask,setNewTask]=useState({label:"",due:"",freq:"mensual",cat:"dgi"});
   const [showDone,setShowDone]=useState(false); // toggle ver tareas hechas
@@ -1829,16 +1982,43 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
   const [certBoletoIdx,setCertBoletoIdx]=useState(-1);
   const [certBoletoMonto,setCertBoletoMonto]=useState("");
 
-  const {items:items2908,total:total2908}=useMemo(()=>calc2908(client,config),[client,config]);
+  const {items:items2908,total:total2908}=useMemo(()=>calc2908(client,config,period),[client,config,period]);
   const obs=useMemo(()=>getObs(client,period).map(o=>o.id==="form2908"?{...o,monto:total2908,items2908}:o),[client,period,total2908,items2908]);
-  const getOb=(id,f)=>obState[period]?.[id]?.[f]||false;
-  const setOb=(id,f)=>setObState(prev=>({...prev,[period]:{...(prev[period]||{}),[id]:{...(prev[period]?.[id]||{}),[f]:!getOb(id,f)}}}));
+  // Lo tildado se guarda en el cliente: antes vivía en un useState y se perdía al salir.
+  const getOb=(id,f)=>!!client.obPagos?.[period]?.[id]?.[f];
+  const setOb=(id,f)=>upd("obPagos",{...client.obPagos,[period]:{...(client.obPagos?.[period]||{}),[id]:{...(client.obPagos?.[period]?.[id]||{}),[f]:!getOb(id,f)}}});
   const monthlyObs=obs.filter(o=>o.freq==="mensual");
   const annualObs=obs.filter(o=>o.freq==="anual");
   const specialObs=obs.filter(o=>o.freq==="especial");
 
   const upd=(f,v)=>setClients(prev=>prev.map(c=>c.id===client.id?{...c,[f]:v}:c));
   const updTax=(k,v)=>upd("taxes",{...client.taxes,[k]:v});
+  // Importe de un renglón del 2908 pisado a mano para este mes (vacío = vuelve al automático)
+  const setAnticipo=(key,v)=>upd("anticipos",{...client.anticipos,[period]:{...(client.anticipos?.[period]||{}),[key]:v}});
+  // Deja los doce meses del año con los anticipos fijos ya cargados. El IVA queda afuera:
+  // ese sale de la facturación de cada mes y no tiene sentido precargarlo.
+  const precargarAnio=(anio)=>{
+    const t=client.taxes||{};
+    const min=t.iraeMinimoMensual!=null&&t.iraeMinimoMensual!==""?+t.iraeMinimoMensual:(config?.iraeMinimoMensual||0);
+    const ip=t.patrimonio&&t.renta!=="ninguno"?(t.ipAnticipoMensual!=null&&t.ipAnticipoMensual!==""?+t.ipAnticipoMensual:Math.round((+t.ipMontoAnual||0)/12)):null;
+    const next={...(client.anticipos||{})};
+    for(let mes=1;mes<=12;mes++){
+      const p=`${String(mes).padStart(2,"0")}/${anio}`;
+      const row={...(next[p]||{})};
+      // Sólo se precarga lo que tiene importe: un renglón en cero no aporta nada
+      if(t.renta==="irae"&&min>0)row.irae=min;
+      if(ip)row.ip=ip;
+      if(client.entityType==="sa"&&+client.icosaMonto>0)row.icosa=+client.icosaMonto;
+      if(t.iva==="minimo"&&config?.ivaMinimo>0)row.ivaMin=config.ivaMinimo;
+      if(Object.keys(row).length)next[p]=row;
+    }
+    upd("anticipos",next);
+  };
+  const limpiarAnio=(anio)=>{
+    const next={...(client.anticipos||{})};
+    for(let mes=1;mes<=12;mes++)delete next[`${String(mes).padStart(2,"0")}/${anio}`];
+    upd("anticipos",next);
+  };
   const updCred=(k,v)=>upd("credentials",{...client.credentials,[k]:v});
 
   const billing=client.billing?.[period]||{factEmitida:false,factEnviada:false,pagoRecibido:false};
@@ -1851,7 +2031,16 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
 
   // ── Boletos helpers ──
   const getBoleto=(org)=>client.boletos?.[period]?.[org]||{};
-  const updBoleto=(org,f,v)=>upd("boletos",{...client.boletos,[period]:{...(client.boletos?.[period]||{}),[org]:{...getBoleto(org),[f]:v}}});
+  const setBoleto=(org,patch)=>upd("boletos",{...client.boletos,[period]:{...(client.boletos?.[period]||{}),[org]:{...getBoleto(org),...patch}}});
+  const updBoleto=(org,f,v)=>setBoleto(org,{[f]:v});
+  // Generar el boleto deja el importe cargado en Pagos / Trámites, listo para pagar y avisar
+  const generarBoleto=(org)=>{
+    const detalle=org==="dgi"
+      ?items2908.map(i=>`${i.label}: $ ${fU(i.monto,0)}`).join(" · ")
+      :`Aportes BPS de ${(client.employees||[]).length} empleado${(client.employees||[]).length!==1?"s":""} según la liquidación del mes`;
+    setBoleto(org,{monto:org==="dgi"?total2908:aportesBPS(client,period,config),detalle,generado:TODAY});
+    setTab("operativo");
+  };
   const boletoWAMsg=()=>{const bps=getBoleto("bps"),dgi=getBoleto("dgi");const lines=[];if(bps.monto)lines.push(`BPS (vto. día ${config.diaBPS||10}): $${Number(bps.monto).toLocaleString("es-UY")}${bps.ref?` - Ref: ${bps.ref}`:""}`);if(dgi.monto)lines.push(`DGI 2908 (vto. día ${config.diaDGI||22}): $${Number(dgi.monto).toLocaleString("es-UY")}${dgi.ref?` - Ref: ${dgi.ref}`:""}`);const tot=(+bps.monto||0)+(+dgi.monto||0);if(tot>0)lines.push(`*Total: $${tot.toLocaleString("es-UY")}*`);return`Hola *${client.name}*, importes del período *${period}*:\n\n${lines.join("\n")}\n\nSaludos, ${config.studioName||"Estudio"}`};
   const applyCertBoleto=()=>{if(certBoletoIdx<0||!certBoletoMonto||!certBoletoOrg)return;const monto=Math.min(+certBoletoMonto,(client.certsDGI||[])[certBoletoIdx]?.saldoRestante||0);const certs=[...(client.certsDGI||[])];const cc=certs[certBoletoIdx];const ns=(cc.saldoRestante||0)-monto;certs[certBoletoIdx]={...cc,saldoRestante:Math.max(0,ns),usado:ns<=0};upd("certsDGI",certs);updBoleto(certBoletoOrg,"pagadoCert",true);updBoleto(certBoletoOrg,"certMonto",(getBoleto(certBoletoOrg).certMonto||0)+monto);setCertBoletoMonto("");setCertBoletoIdx(-1);setCertBoletoOrg("");};
 
@@ -1891,7 +2080,7 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
     </div>;
   };
 
-  const TABS=[{id:"resumen",l:"Resumen"},{id:"datos",l:"Datos"},{id:"tributario",l:"Tributario"},{id:"operativo",l:"Operativo / Trámites"},{id:"comercial",l:"Comercial"}];
+  const TABS=[{id:"resumen",l:"Resumen"},{id:"datos",l:"Datos"},{id:"tributario",l:"Tributario"},{id:"operativo",l:"Pagos / Trámites"},{id:"comercial",l:"Comercial"}];
   if(client.hasEmployees)TABS.splice(2,0,{id:"sueldos",l:"Sueldos"});
   const certsActive=(client.certsDGI||[]).filter(c=>!c.usado&&c.vencimiento);const certDD=certsActive.length>0?Math.min(...certsActive.map(c=>{const d=daysUntil(c.vencimiento);return d===null?99999:d;})):null;
 
@@ -1917,7 +2106,7 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           </div>
         </div>
         <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
-          {ACTIVE_STUDIO==="laser"&&<button onClick={()=>setShowReporte(true)} style={{background:"#8ECBDE",color:"#021942",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontFamily:F,fontSize:11.5,fontWeight:700,marginRight:3}}>📄 Reporte</button>}
+          <button onClick={()=>setShowReporte(true)} style={{background:ACTIVE_STUDIO==="laser"?"#8ECBDE":VC_GOLD_LIGHT,color:ACTIVE_STUDIO==="laser"?"#021942":VC_NAVY,border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontFamily:F,fontSize:11.5,fontWeight:700,marginRight:3}}>📄 Reporte</button>
           <button title="WhatsApp" onClick={()=>{const _wn=(client.whatsapp||"").replace(/\D/g,"");_wn.length>5&&openUrl(`https://wa.me/${_wn}`);}} style={{background:"#25D36618",border:"1px solid #25D36640",borderRadius:7,padding:"3px 6px",cursor:"pointer",display:"flex",alignItems:"center"}}>
             <Logo src={LOGO_WA} size={22} style={{padding:1,borderRadius:3}}/>
           </button>
@@ -2001,6 +2190,14 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
                   <label style={lbl}>Coeficiente IRAE</label>
                   <NumInput value={client.taxes?.iraeCoeficiente} onChange={v=>updTax("iraeCoeficiente",v)} style={inp} placeholder="Ej: 0.2500"/>
                 </div>
+                <div style={{gridColumn:"1/-1"}}>
+                  <label style={lbl}>Anticipo mínimo mensual del año ($)</label>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <NumInput value={client.taxes?.iraeMinimoMensual} onChange={v=>updTax("iraeMinimoMensual",v)} style={{...inp,flex:1}} placeholder={`Sin completar usa el de Configuración: ${fU(config?.iraeMinimoMensual||0,0)}`}/>
+                    <button onClick={()=>updTax("iraeMinimoMensual",config?.iraeMinimoMensual||0)} style={{background:C.blue+"14",color:C.blue,border:`1px solid ${C.blue}35`,borderRadius:6,padding:"7px 11px",fontSize:11.5,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>Usar el vigente</button>
+                  </div>
+                  <div style={{fontSize:11,color:C.gray,fontFamily:F,marginTop:4}}>Cada mes se paga el mayor entre el coeficiente aplicado a la facturación y este mínimo.</div>
+                </div>
                 <div style={{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginTop:2}}>
                   <Check checked={client.taxes?.iraeEsMinimo||false} onChange={()=>updTax("iraeEsMinimo",!client.taxes?.iraeEsMinimo)} color={C.ok}/>
                   <span style={{fontSize:13,color:C.navy,fontFamily:F}}>Usar anticipo mínimo (de configuración)</span>
@@ -2036,6 +2233,22 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
               </div>
             </div>
           </>}
+          {(()=>{const anio=+period.split("/")[1];const cargados=MESES.map((_,i)=>`${String(i+1).padStart(2,"0")}/${anio}`).filter(p=>Object.keys(client.anticipos?.[p]||{}).length).length;
+            return<div style={{gridColumn:"1/-1",background:C.bg,border:`1px solid ${C.border}`,borderRadius:7,padding:"11px 12px"}}>
+              <div style={{fontWeight:600,color:C.navy,fontSize:12,marginBottom:4,fontFamily:F}}>Precargar el año {anio}</div>
+              <div style={{fontSize:11.5,color:C.gray,fontFamily:F,lineHeight:1.5,marginBottom:9}}>
+                Deja los doce meses de {anio} con los anticipos mínimos ya cargados, para no tener que completarlos uno por uno.
+                Después, en <b>Tributario</b>, se edita el mes que haga falta antes de generar el boleto.
+                El IVA no se precarga porque depende de la facturación de cada mes.
+              </div>
+              <div style={{display:"flex",gap:7,alignItems:"center",flexWrap:"wrap"}}>
+                <button onClick={()=>precargarAnio(anio)} style={{background:C.blue,color:"#fff",border:"none",borderRadius:6,padding:"7px 14px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:F}}>Precargar los 12 meses</button>
+                {cargados>0&&<>
+                  <span style={{fontSize:11.5,color:C.ok,fontFamily:F,fontWeight:600}}>{cargados} de 12 meses con importes cargados</span>
+                  <button onClick={()=>{if(window.confirm(`¿Borrar los importes precargados de ${anio}? Los meses vuelven al cálculo automático.`))limpiarAnio(anio);}} style={{background:"transparent",color:C.gray,border:`1px solid ${C.border}`,borderRadius:6,padding:"7px 12px",fontSize:11.5,cursor:"pointer",fontFamily:F}}>Volver todo al automático</button>
+                </>}
+              </div>
+            </div>;})()}
         </FormSection>}
 
         <FormSection title="Certificados DGI">
@@ -2122,16 +2335,31 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           {[["Renta",RENTA_OPT.find(([k])=>k===client.taxes?.renta)?.[1]||"–",C.navy],["IVA",IVA_OPT.find(([k])=>k===client.taxes?.iva)?.[1]||"–",C.blue],["Patrimonio",client.taxes?.patrimonio?"Aplica (1,5%)":"No aplica",client.taxes?.patrimonio?C.warn:C.gray]].map(([l,v,col])=><div key={l} style={{flex:1,minWidth:130,borderLeft:`3px solid ${col}`,paddingLeft:10}}><div style={{fontSize:10,color:C.gray,fontFamily:F}}>{l}</div><div style={{fontSize:12,fontWeight:600,color:col,fontFamily:F}}>{v}</div></div>)}
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:12,color:C.gray,fontFamily:F}}>Período:</span><PeriodNav period={period} setPeriod={setPeriod} inline/><span style={{fontSize:11,color:C.gray,fontFamily:F}}>{obs.length} obligaciones · {obs.filter(o=>getOb(o.id,"paid")).length} pagadas</span></div>
-        {items2908.length>0&&<div style={{background:C.white,border:`1px solid ${C.blue}30`,borderRadius:8,padding:14,boxShadow:"0 1px 3px #0001"}}>
-          <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:10,display:"flex",alignItems:"center",gap:8,fontFamily:F}}>
-            <div style={{width:4,height:14,background:C.blue,borderRadius:2}}/>Desglose Boleto 2908
-            <span style={{marginLeft:"auto",fontSize:12,color:C.ok,fontWeight:700}}>Total: $ {total2908.toLocaleString("es-UY")}</span>
+        {items2908.length>0&&(()=>{const bolDGI=getBoleto("dgi");const alDia=bolDGI.generado&&(+bolDGI.monto||0)===total2908;
+          return<div style={{background:C.white,border:`1px solid ${C.blue}30`,borderRadius:8,padding:14,boxShadow:"0 1px 3px #0001"}}>
+          <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:4,display:"flex",alignItems:"center",gap:8,fontFamily:F}}>
+            <div style={{width:4,height:14,background:C.blue,borderRadius:2}}/>Boleto 2908 — {period}
+            <span style={{marginLeft:"auto",fontSize:11,color:C.gray,fontWeight:400}}>Vence el {vtoDGI(period,config.diaDGI)}</span>
           </div>
-          {items2908.map((it,i)=><div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 10px",background:C.bg,borderRadius:5,marginBottom:4}}>
-            <div><span style={{fontSize:12,color:C.navy,fontFamily:F}}>{it.label}</span>{it.hint&&<span style={{fontSize:10,color:it.ivaFavor>0?C.ok:C.gray,fontFamily:F,marginLeft:6}}>{it.hint}</span>}</div>
-            <span style={{fontSize:12,fontWeight:600,color:it.monto>0?C.navy:C.gray,fontFamily:F}}>$ {it.monto.toLocaleString("es-UY")}</span>
+          <div style={{fontSize:11,color:C.gray,fontFamily:F,marginBottom:9}}>Los importes se calculan solos. Si necesitás otro número para este mes, escribilo y queda guardado sólo para {period}.</div>
+          {items2908.map((it,i)=><div key={it.key} style={{display:"flex",alignItems:"center",gap:9,padding:"7px 10px",background:it.manual?C.warn+"0e":C.bg,border:`1px solid ${it.manual?C.warn+"40":"transparent"}`,borderRadius:6,marginBottom:4}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,color:C.navy,fontFamily:F,fontWeight:600}}>{it.label}</div>
+              {it.hint&&<div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:1}}>{it.hint}</div>}
+              {it.manual&&<div style={{fontSize:10.5,color:C.warn,fontFamily:F,marginTop:1}}>Modificado a mano · el cálculo daba $ {fU(it.auto,0)}</div>}
+            </div>
+            <NumInput value={(client.anticipos?.[period]||{})[it.key]} onChange={v=>setAnticipo(it.key,v)} style={{...inp,width:110,textAlign:"right",fontWeight:700,color:C.navy}} placeholder={fU(it.auto,0)}/>
+            {it.manual&&<button onClick={()=>setAnticipo(it.key,null)} title="Volver al cálculo automático" style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:5,width:24,height:24,cursor:"pointer",color:C.gray,fontSize:11,flexShrink:0}}>↺</button>}
           </div>)}
-        </div>}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginTop:10,paddingTop:10,borderTop:`1px solid ${C.border}`,flexWrap:"wrap"}}>
+            <span style={{fontSize:12,color:C.navy,fontWeight:700,fontFamily:F}}>Total del boleto</span>
+            <span style={{fontSize:18,color:C.blue,fontWeight:800,fontFamily:F}}>$ {fU(total2908,0)}</span>
+            <button onClick={()=>generarBoleto("dgi")} style={{marginLeft:"auto",background:alDia?C.ok+"18":`linear-gradient(135deg,${C.blue},${C.navy})`,color:alDia?C.ok:"#fff",border:alDia?`1px solid ${C.ok}40`:"none",borderRadius:8,padding:"9px 18px",fontSize:12.5,fontWeight:800,cursor:"pointer",fontFamily:F}}>
+              {alDia?"✓ Boleto generado — actualizar":"Generar boleto"}
+            </button>
+          </div>
+          {alDia&&<div style={{fontSize:11,color:C.ok,fontFamily:F,marginTop:7}}>Cargado en <b>Pagos / Trámites</b> el {bolDGI.generado.split("-").reverse().join("/")}. Ahí se marca como pagado y se le avisa al cliente.</div>}
+        </div>;})()}
         {/* ── Certificados de crédito DGI ── */}
         <div style={{background:C.white,borderRadius:8,padding:14,boxShadow:"0 1px 3px #0001"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
@@ -2218,23 +2446,28 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
         <div style={{background:C.white,borderRadius:8,padding:14,boxShadow:"0 1px 3px #0001"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontWeight:600,color:C.navy,fontSize:13,fontFamily:F,display:"flex",alignItems:"center",gap:7}}>
-              <div style={{width:4,height:14,background:C.blue,borderRadius:2}}/>Boletos — {period}
+              <div style={{width:4,height:14,background:C.blue,borderRadius:2}}/>Boletos a pagar — período {period}
             </div>
             <button onClick={()=>{const wn=(client.whatsapp||"").replace(/\D/g,"");if(wn.length>5&&(getBoleto("bps").monto||getBoleto("dgi").monto))openUrl(`https://wa.me/${wn}?text=${encodeURIComponent(boletoWAMsg())}`);else alert("Ingresá los montos y verificá el WhatsApp del cliente.");}} style={{background:"#25D36618",color:"#25D366",border:"1px solid #25D36640",borderRadius:5,padding:"4px 10px",fontSize:11,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:5}}>
               <Logo src={LOGO_WA} size={14} style={{borderRadius:2}}/>Enviar importes
             </button>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {[["bps","BPS",C.blue,config.diaBPS||10],["dgi","DGI 2908",C.red,config.diaDGI||22]].map(([org,label,col,dia])=>{
+            {[["bps","BPS",C.blue,LOGO_BPS,vtoBPS(period,config.diaBPS)],["dgi","DGI — Boleto 2908",C.red,LOGO_DGI,vtoDGI(period,config.diaDGI)]].map(([org,label,col,logo,vto])=>{
               const bol=getBoleto(org);
               return<div key={org} style={{border:`1px solid ${col}30`,borderRadius:7,padding:10,background:bol.pagado?C.ok+"08":col+"05"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
-                  <span style={{fontSize:12,fontWeight:700,color:col,fontFamily:F}}>{label} <span style={{fontWeight:400,fontSize:10,color:C.gray}}>· vto. ~{dia}</span></span>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7,gap:8}}>
+                  <span style={{fontSize:12,fontWeight:700,color:col,fontFamily:F,display:"flex",alignItems:"center",gap:6}}><LogoRaw src={logo} size={20}/>{label}</span>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
                     <Check checked={bol.pagado||false} onChange={()=>updBoleto(org,"pagado",!bol.pagado)} color={C.ok}/>
                     <span style={{fontSize:10,color:C.gray,fontFamily:F}}>Pagado</span>
                   </div>
                 </div>
+                <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:7,flexWrap:"wrap"}}>
+                  <span style={{fontSize:10.5,color:C.gray,fontFamily:F}}>Vence el <b style={{color:C.navy}}>{vto}</b></span>
+                  <button onClick={()=>generarBoleto(org)} style={{marginLeft:"auto",background:col+"14",color:col,border:`1px solid ${col}35`,borderRadius:5,padding:"3px 9px",fontSize:10.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>{bol.generado?"Recalcular":"Generar"}</button>
+                </div>
+                {bol.detalle&&<div style={{fontSize:10,color:C.gray,fontFamily:F,background:C.white,border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 7px",marginBottom:7,lineHeight:1.45}}>{bol.detalle}</div>}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:7}}>
                   <div><label style={lbl}>Monto ($)</label><NumInput value={bol.monto} onChange={v=>updBoleto(org,"monto",v)} style={inp} placeholder="0"/></div>
                   <div><label style={lbl}>N° referencia</label><input value={bol.ref||""} onChange={e=>updBoleto(org,"ref",e.target.value)} style={inp} placeholder="Nro. boleto..."/></div>
@@ -2743,7 +2976,8 @@ export default function Obligo(){
   const [globalPeriod,setGlobalPeriod]=useState(PINIT);
   const [closedPeriods,setClosedPeriods]=useState([]);
   const [proveedores,setProveedores]=useState([]);
-  const CONFIG_DEFAULT={studioName:"Estudio Valeria Calvette",studioCode:"VCEstudio",studioRut:"",studioEmail:"",studioPhone:"",adminPass:"admin123",secretariaPass:"secr123",diaDGI:22,diaBPS:10,bpc:6756,ui:5.9847,iraeMinimoMensual:6550,ivaMinimo:4500,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:22268,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000};
+  // Valores fiscales vigentes 2026, los mismos que usa el otro estudio
+  const CONFIG_DEFAULT={studioName:"Estudio Valeria Calvette",studioCode:"VCEstudio",studioRut:"",studioEmail:"",studioPhone:"",adminPass:"admin123",secretariaPass:"secr123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000};
   const [config,setConfig]=useState(()=>{
     try{const s=localStorage.getItem('gc_config');if(s)return{...CONFIG_DEFAULT,...JSON.parse(s)};}catch(e){}
     return CONFIG_DEFAULT;
@@ -2765,14 +2999,24 @@ export default function Obligo(){
       if(!seedOk){
         const byId={};lsC.forEach(c=>{byId[c.id]=c;});
         lsC=CLIENTS_LASER.map(seed=>{const old=byId[seed.id];if(!old)return seed;
-          return{...seed,sueldos:old.sueldos||{},tramites:old.tramites||[],nominas:old.nominas||{},billing:old.billing||{},facturas:old.facturas||{},boletos:old.boletos||{},incidencias:old.incidencias||[],certsDGI:old.certsDGI||[],credentials:old.credentials||seed.credentials,studyFee:old.studyFee,studyFeePaid:old.studyFeePaid,notes:seed.notes};
+          return{...seed,sueldos:old.sueldos||{},tramites:old.tramites||[],nominas:old.nominas||{},billing:old.billing||{},facturas:old.facturas||{},boletos:old.boletos||{},anticipos:old.anticipos||{},obPagos:old.obPagos||{},incidencias:old.incidencias||[],certsDGI:old.certsDGI||[],credentials:old.credentials||seed.credentials,studyFee:old.studyFee,studyFeePaid:old.studyFeePaid,notes:seed.notes};
         }).concat(lsC.filter(c=>!CLIENTS_LASER.some(s=>s.id===c.id)));
         lsCfg={...lsCfg,bpc:LASER_CONFIG_DEFAULT.bpc,ui:LASER_CONFIG_DEFAULT.ui,salarioMinimo:LASER_CONFIG_DEFAULT.salarioMinimo,ivaMinimo:LASER_CONFIG_DEFAULT.ivaMinimo,iraeMinimoMensual:LASER_CONFIG_DEFAULT.iraeMinimoMensual};
         try{localStorage.setItem('ls_seed',LASER_SEED_V);localStorage.setItem('ls_clients',JSON.stringify(lsC));localStorage.setItem('ls_config',JSON.stringify(lsCfg));}catch(e){}
       }
       setClients(lsC);setConfig(lsCfg);
     }
-    else{setClients(loadList('gc_clients',CLIENTS_INIT));setConfig(loadObj('gc_config',CONFIG_DEFAULT));}
+    else{
+      let gcCfg=loadObj('gc_config',CONFIG_DEFAULT);
+      // Los valores fiscales guardados eran los de 2025: se actualizan una sola vez a los de 2026.
+      // No se toca nada más de la configuración del estudio.
+      let valOk=false;try{valOk=localStorage.getItem('gc_valores')===VC_VALORES_V;}catch(e){}
+      if(!valOk){
+        gcCfg={...gcCfg,bpc:CONFIG_DEFAULT.bpc,ui:CONFIG_DEFAULT.ui,salarioMinimo:CONFIG_DEFAULT.salarioMinimo,ivaMinimo:CONFIG_DEFAULT.ivaMinimo,iraeMinimoMensual:CONFIG_DEFAULT.iraeMinimoMensual};
+        try{localStorage.setItem('gc_valores',VC_VALORES_V);localStorage.setItem('gc_config',JSON.stringify(gcCfg));}catch(e){}
+      }
+      setClients(loadList('gc_clients',CLIENTS_INIT));setConfig(gcCfg);
+    }
     setView("dashboard");setClientId(null);
     setAuthUser(u);
   };
@@ -2841,8 +3085,8 @@ export default function Obligo(){
         <button onClick={()=>exportExcel(clients,globalPeriod)} style={{fontSize:10,background:"#EFF6FF",color:C.blue,border:`1px solid ${C.blue}40`,borderRadius:4,padding:"3px 8px",cursor:"pointer",fontFamily:F,fontWeight:600,marginLeft:"auto"}}>↓ Excel</button>
       </div>}
       <div style={{flex:1,overflowY:"auto"}}>
-        {view==="dashboard"&&<Dashboard clients={clients} setClients={setClients} setView={setView} openClient={openClient} user={authUser} proveedores={proveedores} setProveedores={setProveedores} period={globalPeriod} setPeriod={setGlobalPeriod}/>}
-        {view==="clients"&&<ClientList clients={clients} openClient={openClient} onNew={addClient}/>}
+        {view==="dashboard"&&<Dashboard clients={clients} setClients={setClients} setView={setView} openClient={openClient} user={authUser} proveedores={proveedores} setProveedores={setProveedores} period={globalPeriod} setPeriod={setGlobalPeriod} config={config}/>}
+        {view==="clients"&&<ClientList clients={clients} openClient={openClient} onNew={addClient} period={globalPeriod} config={config}/>}
         {view==="client"&&client&&<ClientDetail client={client} clients={clients} setClients={setClients} goBack={goBack} user={authUser} period={globalPeriod} setPeriod={setGlobalPeriod} config={config}/>}
         {view==="tareas"&&<TasksModule clients={clients} setClients={setClients} period={globalPeriod} user={authUser}/>}
         {view==="alertas"&&<AlertsCenter clients={clients}/>}
