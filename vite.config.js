@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192.png', 'icon-512.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'GestCont ERP',
-        short_name: 'GestCont',
-        description: 'Sistema de gestión contable para estudios',
+        name: 'Obligo — Gestión contable',
+        short_name: 'Obligo',
+        description: 'Gestión contable para estudios: obligaciones, sueldos y vencimientos',
         theme_color: '#2948D9',
         background_color: '#2948D9',
         display: 'standalone',

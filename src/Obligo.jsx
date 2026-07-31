@@ -28,6 +28,8 @@ const LOGO_LASER_FULL="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5
 // ─── IDENTIDAD ESTUDIO VALERIA CALVETTE ───────────────────────────
 const VC_GOLD="#C8A44D",VC_GOLD_LIGHT="#E9C877",VC_NAVY="#14294F";
 const LOGO_VC="data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><defs><linearGradient id='ring' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#E3CC8B'/><stop offset='.45' stop-color='#B8963F'/><stop offset='1' stop-color='#E9D49B'/></linearGradient></defs><circle cx='100' cy='100' r='99' fill='url(#ring)'/><circle cx='100' cy='100' r='94' fill='#FBF8F1'/><text x='100' y='93' text-anchor='middle' font-family='Georgia,Times New Roman,serif' font-size='60' font-weight='700' fill='#14294F' letter-spacing='-3'>VC</text><path d='M40 105 H86' stroke='#C8A44D' stroke-width='1.1'/><path d='M114 105 H160' stroke='#C8A44D' stroke-width='1.1'/><path d='M100 100 l4.5 5 -4.5 5 -4.5 -5 z' fill='#C8A44D'/><text x='100' y='127' text-anchor='middle' font-family='Georgia,Times New Roman,serif' font-size='10.5' fill='#14294F' letter-spacing='3.8'>ESTUDIO</text><text x='100' y='144' text-anchor='middle' font-family='Georgia,Times New Roman,serif' font-size='14.5' font-weight='700' fill='#14294F' letter-spacing='2'>IMPOSITIVO</text><text x='100' y='159' text-anchor='middle' font-family='Georgia,Times New Roman,serif' font-size='11.5' fill='#14294F' letter-spacing='2.8'>CONTABLE</text><path d='M74 168 H126' stroke='#C8A44D' stroke-width='1'/><text x='100' y='181' text-anchor='middle' font-family='Georgia,Times New Roman,serif' font-size='8.2' font-style='italic' fill='#14294F'>Normativa clara. Decisiones seguras.</text></svg>`);
+// Versión simplificada del logo VC para el ícono de la pestaña (se lee bien a 16px)
+const FAVICON_VC="data:image/svg+xml;utf8,"+encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='49' fill='#C8A44D'/><circle cx='50' cy='50' r='43' fill='#FBF8F1'/><text x='50' y='68' text-anchor='middle' font-family='Georgia,Times New Roman,serif' font-size='52' font-weight='700' fill='#14294F' letter-spacing='-3'>VC</text></svg>`);
 const C_VC={...C,gold:VC_GOLD};
 const C_LASER={...C,navy:"#021942",blue:"#2948D9",dark:"#021029",bg:"#F1F5FB",border:"#D8E2F2",cell1:"#EAF3FA",cell2:"#D8EAF5",accent:"#8ECBDE"};
 let ACTIVE_STUDIO="vc";
@@ -2615,11 +2617,20 @@ export default function Obligo(){
     setClients(loadList('gc_clients',CLIENTS_INIT));setConfig(loadObj('gc_config',CONFIG_DEFAULT));
   };
 
-  // El título de la pestaña acompaña al estudio (cada subdominio tiene su identidad)
+  // El título y el ícono de la pestaña acompañan al estudio (cada subdominio tiene su identidad).
+  // En la puerta general sólo se personaliza una vez que se sabe con qué estudio entró.
   useEffect(()=>{
-    const st=hostStudio()||studio;
+    const hs=hostStudio();
+    const st=hs||(authUser?studio:null);
+    if(!st)return;
     document.title=st==="laser"?"Laser Solutions · Gestión contable":"Estudio Valeria Calvette · Obligo";
-  },[studio]);
+    try{
+      let l=document.querySelector("link[rel~='icon']");
+      if(!l){l=document.createElement("link");l.rel="icon";document.head.appendChild(l);}
+      l.type="image/svg+xml";
+      l.href=st==="laser"?LOGO_LASER_ISO:FAVICON_VC;
+    }catch(e){}
+  },[studio,authUser]);
 
   const client=useMemo(()=>clients.find(c=>c.id===clientId),[clients,clientId]);
   const openClient=(id)=>{setClientId(id);setView("client");};
