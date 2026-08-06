@@ -257,7 +257,7 @@ const mk=(id,name,entityType,nature,taxes,opts={})=>{
     studyFee:null,studyFeePaid:false,studyFeeDate:null,studyFeeNotes:"",
     billing:{},nominas:{},facturas:{},
     credentials:mkCred(),notes:"",grupoSubgrupo:"",tasks:[],tramites:[],
-    certsDGI,boletos:{},anticipos:{},obPagos:{},incidencias:[],ivaVentasMes:null,ivaComprasMes:null,ivaFavorAcumulado:0,
+    certsDGI,boletos:{},anticipos:{},obPagos:{},aportaciones:[],docsLeidos:[],incidencias:[],ivaVentasMes:null,ivaComprasMes:null,ivaFavorAcumulado:0,
     domelMTSS:false,cierreBalance:"",grupoMTSS:"",
     gubAsocBPS:false,gubAsocDGI:false,gubAsocBSE:false,
     ...o};
@@ -354,6 +354,7 @@ const normClient=(c)=>({
   specialTaxes:Array.isArray(c.specialTaxes)?c.specialTaxes:[],
   nominas:c.nominas||{},sueldos:c.sueldos||{},billing:c.billing||{},facturas:c.facturas||{},boletos:c.boletos||{},
   anticipos:c.anticipos||{},obPagos:c.obPagos||{},
+  aportaciones:Array.isArray(c.aportaciones)?c.aportaciones:[],docsLeidos:Array.isArray(c.docsLeidos)?c.docsLeidos:[],
   credentials:c.credentials||mkCred(),
 });
 const CLIENTS_LASER=marcarAlDia([
@@ -416,7 +417,7 @@ const CLIENTS_LASER=marcarAlDia([
 ]);
 // Valores vigentes 2026: BPC $6.864 (Dec. 11/026) · SMN $24.572 (Dec. 319/025; desde 1/7/2026: $25.383)
 // IVA Mínimo $5.910 e IRAE mínimo $6.840 (Dec. 310/025) · UI al 12/06/2026: $6,5720 (ajusta a diario, ver BCU/INE)
-const LASER_CONFIG_DEFAULT={studioName:"Laser Solutions",studioCode:"LaserSolutions",studioRut:"",studioEmail:"sales@lasersolutions.com",studioPhone:"",adminPass:"laser2026",secretariaPass:"ayud123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000};
+const LASER_CONFIG_DEFAULT={studioName:"Laser Solutions",studioCode:"LaserSolutions",studioRut:"",studioEmail:"sales@lasersolutions.com",studioPhone:"",adminPass:"laser2026",secretariaPass:"ayud123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000,cotizaciones:[]};
 const LASER_SEED_V="6";
 
 // ─── ETIQUETAS ESPECIALES (Solo Web / Solo Marketing / Convenio pendiente) ───
@@ -1966,7 +1967,227 @@ function CalculoMes({client,upd,updTax,period,config}){
 }
 
 // ─── CLIENT DETAIL ────────────────────────────────────────────────
-function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,config}){
+// ─── LECTURA DE DOCUMENTOS ────────────────────────────────────────
+const ETIQ_CAMPO={name:"Razón social",rut:"RUT",numEmpresa:"Nº empresa (BPS)",cedula:"Cédula titular",giro:"Giro",
+  startDate:"Inicio de actividades",inscripcionDGI:"Inscripción en DGI",cierreBalance:"Cierre de balance",
+  efactura:"e-Factura",phone:"Teléfono",whatsapp:"WhatsApp",email:"Email",domicilio:"Domicilio",
+  grupoMTSS:"Grupo MTSS",entityType:"Tipo de entidad",hasEmployees:"Tiene empleados",codigoConsejo:"Código del consejo de salarios"};
+const EFACT_TXT={activo:"Activo",pendiente:"Pendiente",no_aplica:"No aplica",exceptuado:"Exceptuado"};
+const verCampo=(k,v)=>{
+  if(v===""||v==null)return "—";
+  if(k==="entityType")return ENTITY[v]||v;
+  if(k==="hasEmployees")return v?"Sí":"No";
+  if(k==="efactura")return EFACT_TXT[v]||v;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(String(v)))return String(v).split("-").reverse().join("/");
+  return String(v);
+};
+const leerArchivo=(file)=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(new Error("No pude leer el archivo"));r.readAsArrayBuffer(file);});
+
+function LectorDocs({client,updVarios,period,config,setConfig}){
+  const {m:ldM}=useR();
+  const [cert,setCert]=useState(null);
+  const [selCampos,setSelCampos]=useState({});
+  const [selEmp,setSelEmp]=useState({});
+  const [rec,setRec]=useState(null);
+  const [cargando,setCargando]=useState("");
+  const [err,setErr]=useState("");
+  const [aviso,setAviso]=useState("");
+  const refCert=useRef(),refRec=useRef();
+  const cotiz=config?.cotizaciones||[];
+
+  const subirCert=async(file)=>{
+    if(!file)return;setErr("");setAviso("");setCargando("cert");
+    try{
+      const {textoPDF,leerCertificado}=await import("./lectores.js");
+      const r=leerCertificado(await textoPDF(await leerArchivo(file)));
+      if(!r.tipo)throw new Error("No reconocí el documento. Por ahora leo la Consulta de Datos Registrales y la Constancia de inscripción de DGI, y del BPS la Situación de Contribuyentes y la Planilla de Trabajo Unificada.");
+      // Vienen marcados sólo los datos que cambian algo
+      const s={};Object.entries(r.campos).forEach(([k,v])=>{s[k]=String(client[k]??"")!==String(v);});
+      r.obligaciones.forEach((o,i)=>{if(o.campo)s["ob"+i]=true;});
+      setSelCampos(s);setSelEmp(Object.fromEntries(r.empleados.map((e,i)=>[i,!e.titular])));
+      setCert({...r,archivo:file.name});
+    }catch(e){setErr(e.message||String(e));setCert(null);}
+    finally{setCargando("");if(refCert.current)refCert.current.value="";}
+  };
+
+  const aplicarCert=()=>{
+    if(!cert)return;
+    const patch={},taxes={};let n=0;
+    Object.entries(cert.campos).forEach(([k,v])=>{if(selCampos[k]){patch[k]=v;n++;}});
+    cert.obligaciones.forEach((o,i)=>{
+      if(!selCampos["ob"+i]||!o.campo)return;
+      if(o.campo==="icosa")return;n++;
+      taxes[o.campo]=o.valor;
+    });
+    if(cert.aportaciones.length)patch.aportaciones=cert.aportaciones;
+    const nuevos=cert.empleados.filter((e,i)=>selEmp[i]);
+    if(nuevos.length){
+      const ya=(client.employees||[]).map(e=>String(e.ci||"").replace(/\D/g,""));
+      const suma=nuevos.filter(e=>!ya.includes(e.ci)).map(e=>({id:Date.now()+Math.random(),name:e.name,ci:e.ci,cargo:e.cargo,
+        tipo:e.tipo,sueldo:e.sueldo,jornal:null,menores:0,snisAd:0,ingreso:e.ingreso,notes:""}));
+      if(suma.length){patch.employees=[...(client.employees||[]),...suma];n+=suma.length;}
+    }
+    patch.docsLeidos=[...(client.docsLeidos||[]).filter(d=>d.tipo!==cert.tipo),{tipo:cert.tipo,nombre:cert.tipoNombre,archivo:cert.archivo,fecha:TODAY}];
+    if(Object.keys(taxes).length)patch.taxes=taxes;
+    updVarios(patch);
+    setAviso(`Guardado: ${n} dato${n!==1?"s":""} del ${cert.tipoNombre}.`);
+    setCert(null);
+  };
+
+  const subirRec=async(file)=>{
+    if(!file)return;setErr("");setAviso("");setCargando("rec");
+    try{
+      const [{leerRecibidos},XLSX]=await Promise.all([import("./lectores.js"),import("xlsx")]);
+      const wb=XLSX.read(new Uint8Array(await leerArchivo(file)),{type:"array"});
+      const filas=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false});
+      const r=leerRecibidos(filas,cotiz);
+      if(r.error)throw new Error(r.error);
+      if(!r.registros.length)throw new Error("El archivo no tiene comprobantes.");
+      setRec({...r,archivo:file.name});
+    }catch(e){setErr(e.message||String(e));setRec(null);}
+    finally{setCargando("");if(refRec.current)refRec.current.value="";}
+  };
+
+  const aplicarRec=()=>{
+    if(!rec)return;
+    const p=rec.periodo||period;
+    const b={...(client.billing?.[p]||{}),ivaCompras:Math.round(rec.totales.iva*100)/100,
+      comprasNeto:Math.round(rec.totales.neto*100)/100,retTarj:Math.round(rec.totales.retPer*100)/100};
+    updVarios({billing:{...client.billing,[p]:b}});
+    setAviso(`IVA de compras de ${p} cargado: $ ${fU(rec.totales.iva,2)}. Ya se ve en el cálculo del mes.`);
+    setRec(null);
+  };
+
+  const caja={background:C.bg,border:`1px dashed ${C.border}`,borderRadius:9,padding:"13px 14px"};
+  const btn={background:C.blue,color:"#fff",border:"none",borderRadius:7,padding:"8px 15px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F};
+
+  return<FormSection title="Documentos — lectura automática" cols={1}>
+    {err&&<div style={{gridColumn:"1/-1",background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#7F1D1D",fontFamily:F}}>{err}</div>}
+    {aviso&&<div style={{gridColumn:"1/-1",background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:8,padding:"10px 12px",fontSize:12,color:"#14532D",fontFamily:F,fontWeight:600}}>{aviso}</div>}
+
+    {/* ── Certificados ── */}
+    <div style={caja}>
+      <div style={{fontWeight:700,color:C.navy,fontSize:12.5,fontFamily:F,marginBottom:3}}>Certificados y constancias</div>
+      <div style={{fontSize:11.5,color:C.gray,fontFamily:F,lineHeight:1.5,marginBottom:9}}>
+        Subí el PDF tal como lo bajás de DGI o del BPS y la ficha se completa sola. Lee la Consulta de Datos
+        Registrales y la Constancia de inscripción de DGI, y del BPS la Situación de Contribuyentes y la
+        Planilla de Trabajo Unificada. Nada se guarda hasta que lo revises.
+      </div>
+      <input ref={refCert} type="file" accept=".pdf" style={{display:"none"}} onChange={e=>subirCert(e.target.files?.[0])}/>
+      <button onClick={()=>refCert.current?.click()} disabled={cargando==="cert"} style={{...btn,opacity:cargando==="cert"?.6:1}}>
+        {cargando==="cert"?"Leyendo…":"Subir certificado (PDF)"}
+      </button>
+      {(client.docsLeidos||[]).length>0&&<div style={{marginTop:9,display:"flex",flexDirection:"column",gap:3}}>
+        {(client.docsLeidos||[]).map((d,i)=><div key={i} style={{fontSize:11,color:C.gray,fontFamily:F}}>
+          ✓ {d.nombre} · leído el {d.fecha.split("-").reverse().join("/")}
+        </div>)}
+      </div>}
+    </div>
+
+    {cert&&<div style={{gridColumn:"1/-1",background:C.white,border:`1px solid ${C.blue}45`,borderRadius:10,padding:14,boxShadow:"0 1px 3px #0001"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+        <div style={{width:4,height:15,background:C.blue,borderRadius:2}}/>
+        <span style={{fontWeight:700,color:C.navy,fontSize:13,fontFamily:F}}>{cert.tipoNombre}</span>
+        <span style={{fontSize:11,color:C.gray,fontFamily:F}}>{cert.archivo}</span>
+      </div>
+      <div style={{fontSize:11.5,color:C.gray,fontFamily:F,marginBottom:10}}>Destildá lo que no quieras pisar.</div>
+
+      {Object.keys(cert.campos).length>0&&<div style={{display:"flex",flexDirection:"column",gap:4,marginBottom:10}}>
+        {Object.entries(cert.campos).map(([k,v])=>{const igual=String(client[k]??"")===String(v);
+          return<div key={k} onClick={()=>setSelCampos(s=>({...s,[k]:!s[k]}))} style={{display:"flex",alignItems:"center",gap:9,padding:"6px 9px",borderRadius:6,cursor:"pointer",background:selCampos[k]?C.blue+"0c":C.bg,border:`1px solid ${selCampos[k]?C.blue+"35":"transparent"}`}}>
+            <Check checked={!!selCampos[k]} onChange={()=>{}} color={C.blue}/>
+            <span style={{fontSize:11.5,color:C.gray,fontFamily:F,minWidth:ldM?90:160}}>{ETIQ_CAMPO[k]||k}</span>
+            {!igual&&<span style={{fontSize:11.5,color:C.gray,fontFamily:F,textDecoration:"line-through",opacity:.7}}>{verCampo(k,client[k])}</span>}
+            <span style={{fontSize:12,color:C.navy,fontFamily:F,fontWeight:600}}>{verCampo(k,v)}</span>
+            {igual&&<span style={{marginLeft:"auto",fontSize:10.5,color:C.ok,fontFamily:F}}>ya coincide</span>}
+          </div>;})}
+      </div>}
+
+      {cert.obligaciones.length>0&&<div style={{marginBottom:10}}>
+        <div style={{fontSize:11,color:C.gray,fontFamily:F,fontWeight:700,letterSpacing:.4,marginBottom:5}}>OBLIGACIONES ANTE DGI</div>
+        {cert.obligaciones.map((o,i)=><div key={i} onClick={()=>o.campo&&setSelCampos(s=>({...s,["ob"+i]:!s["ob"+i]}))} style={{display:"flex",alignItems:"center",gap:9,padding:"6px 9px",borderRadius:6,marginBottom:3,cursor:o.campo?"pointer":"default",background:selCampos["ob"+i]?C.blue+"0c":C.bg,border:`1px solid ${selCampos["ob"+i]?C.blue+"35":"transparent"}`}}>
+          <div style={{opacity:o.campo?1:.3}}><Check checked={!!selCampos["ob"+i]} onChange={()=>{}} color={C.blue}/></div>
+          <span style={{fontSize:12,color:C.navy,fontFamily:F,fontWeight:600}}>{o.nombre}</span>
+          <span style={{fontSize:11,color:C.gray,fontFamily:F}}>desde {verCampo("f",o.desde)}</span>
+          <span style={{marginLeft:"auto",fontSize:11,color:o.campo?C.blue:C.gray,fontFamily:F}}>{o.campo?`→ ${o.etiqueta}`:"sin equivalente en el sistema"}</span>
+        </div>)}
+      </div>}
+
+      {cert.aportaciones.length>0&&<div style={{marginBottom:10}}>
+        <div style={{fontSize:11,color:C.gray,fontFamily:F,fontWeight:700,letterSpacing:.4,marginBottom:5}}>APORTACIONES BPS</div>
+        {cert.aportaciones.map((a,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:9,padding:"6px 9px",borderRadius:6,background:C.bg,marginBottom:3}}>
+          <span style={{fontSize:12,color:C.navy,fontFamily:F,fontWeight:600}}>{a.nombre}</span>
+          <Pill label={a.estado} color={a.estado==="ACTIVA"?C.ok:C.gray}/>
+          <span style={{fontSize:11,color:C.gray,fontFamily:F}}>desde {verCampo("f",a.desde)}</span>
+        </div>)}
+      </div>}
+
+      {cert.empleados.length>0&&<div style={{marginBottom:10}}>
+        <div style={{fontSize:11,color:C.gray,fontFamily:F,fontWeight:700,letterSpacing:.4,marginBottom:5}}>PERSONAL DE LA PLANILLA ({cert.empleados.length})</div>
+        {cert.empleados.map((e,i)=>{const ya=(client.employees||[]).some(x=>String(x.ci||"").replace(/\D/g,"")===e.ci);
+          return<div key={i} onClick={()=>!ya&&setSelEmp(s=>({...s,[i]:!s[i]}))} style={{display:"flex",alignItems:"center",gap:9,padding:"6px 9px",borderRadius:6,marginBottom:3,cursor:ya?"default":"pointer",background:selEmp[i]&&!ya?C.blue+"0c":C.bg,border:`1px solid ${selEmp[i]&&!ya?C.blue+"35":"transparent"}`,opacity:ya?.6:1}}>
+            <div style={{opacity:ya?.3:1}}><Check checked={!!selEmp[i]&&!ya} onChange={()=>{}} color={C.blue}/></div>
+            <span style={{fontSize:12,color:C.navy,fontFamily:F,fontWeight:600,flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.name}</span>
+            <span style={{fontSize:11,color:C.gray,fontFamily:F}}>{e.cargo}</span>
+            {e.sueldo!=null&&<span style={{fontSize:11.5,color:C.navy,fontFamily:F,fontWeight:700}}>$ {fU(e.sueldo,2)}</span>}
+            {ya?<span style={{fontSize:10.5,color:C.ok,fontFamily:F}}>ya está</span>
+              :e.titular?<span style={{fontSize:10.5,color:C.warn,fontFamily:F}}>titular</span>:null}
+          </div>;})}
+      </div>}
+
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <button onClick={aplicarCert} style={{...btn,background:C.ok}}>Guardar lo marcado</button>
+        <button onClick={()=>setCert(null)} style={{background:"transparent",color:C.gray,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 15px",fontSize:12.5,cursor:"pointer",fontFamily:F}}>Descartar</button>
+      </div>
+    </div>}
+
+    {/* ── Recibidos DGI ── */}
+    <div style={caja}>
+      <div style={{fontWeight:700,color:C.navy,fontSize:12.5,fontFamily:F,marginBottom:3}}>Comprobantes recibidos de DGI</div>
+      <div style={{fontSize:11.5,color:C.gray,fontFamily:F,lineHeight:1.5,marginBottom:9}}>
+        Subí el Excel de CFE Recibidos y sale el IVA de compras del mes. Lo que está en dólares se pasa a pesos
+        con la cotización del día hábil anterior, que es la que corresponde. Los remitos se dejan afuera porque no llevan IVA.
+        {cotiz.length===0&&<b style={{color:C.warn,display:"block",marginTop:4}}>Todavía no hay cotizaciones cargadas: andá a Configuración → Cotizaciones del BCU.</b>}
+      </div>
+      <input ref={refRec} type="file" accept=".xls,.xlsx,.csv" style={{display:"none"}} onChange={e=>subirRec(e.target.files?.[0])}/>
+      <button onClick={()=>refRec.current?.click()} disabled={cargando==="rec"} style={{...btn,opacity:cargando==="rec"?.6:1}}>
+        {cargando==="rec"?"Leyendo…":"Subir recibidos (Excel)"}
+      </button>
+    </div>
+
+    {rec&&<div style={{gridColumn:"1/-1",background:C.white,border:`1px solid ${C.ok}45`,borderRadius:10,padding:14,boxShadow:"0 1px 3px #0001"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:9,flexWrap:"wrap"}}>
+        <div style={{width:4,height:15,background:C.ok,borderRadius:2}}/>
+        <span style={{fontWeight:700,color:C.navy,fontSize:13,fontFamily:F}}>Recibidos de {periodoLargo(rec.periodo||period)}</span>
+        <span style={{fontSize:11,color:C.gray,fontFamily:F}}>{rec.nFiscales} comprobante{rec.nFiscales!==1?"s":""}{rec.nRemitos?` · ${rec.nRemitos} remito${rec.nRemitos!==1?"s":""} sin IVA`:""}</span>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:ldM?"repeat(2,1fr)":"repeat(4,1fr)",gap:8,marginBottom:10}}>
+        {[["Neto",rec.totales.neto,C.navy],["IVA de compras",rec.totales.iva,C.blue],["Total",rec.totales.total,C.gray],["Retenciones",rec.totales.retPer,C.warn]].map(([l,v,col])=>(
+          <div key={l} style={{padding:"9px 11px",background:col+"0d",border:`1px solid ${col}22`,borderRadius:8}}>
+            <div style={{fontSize:10,color:C.gray,fontFamily:F}}>{l}</div>
+            <div style={{fontSize:15,fontWeight:800,color:col,fontFamily:F,fontVariantNumeric:"tabular-nums"}}>$ {fU(v,2)}</div>
+          </div>))}
+      </div>
+      {rec.nME>0&&<div style={{background:C.bg,borderRadius:8,padding:"9px 11px",marginBottom:10}}>
+        <div style={{fontSize:11,color:C.gray,fontFamily:F,fontWeight:700,marginBottom:5}}>{rec.nME} comprobante{rec.nME!==1?"s":""} en moneda extranjera, pasado{rec.nME!==1?"s":""} a pesos</div>
+        {rec.registros.filter(r=>r.moneda!=="UYU"&&r.fiscal&&!r.sinTC).map((r,i)=>(
+          <div key={i} style={{fontSize:11,color:C.navy,fontFamily:F,padding:"2px 0"}}>
+            {r.fecha.split("-").reverse().join("/")} · {r.moneda} {fU(r.neto,2)} × {fU(r.tc,4)} <span style={{color:C.gray}}>(T/C del {r.tcFecha.split("-").reverse().join("/")})</span> = <b>$ {fU(r.neto*r.tc,2)}</b>
+          </div>))}
+      </div>}
+      {rec.faltantes.length>0&&<div style={{background:"#FFFBEB",border:"1px solid #FDE68A",borderRadius:8,padding:"9px 11px",marginBottom:10,fontSize:11.5,color:"#78350F",fontFamily:F}}>
+        Quedaron {rec.faltantes.length} comprobante{rec.faltantes.length!==1?"s":""} afuera del total porque no tengo la cotización del día anterior
+        ({rec.faltantes.slice(0,3).map(r=>r.fecha.split("-").reverse().join("/")).join(", ")}{rec.faltantes.length>3?"…":""}). Cargá esas cotizaciones y volvé a subir el archivo.
+      </div>}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+        <button onClick={aplicarRec} style={{...btn,background:C.ok}}>Cargar el IVA de compras en {rec.periodo||period}</button>
+        <button onClick={()=>setRec(null)} style={{background:"transparent",color:C.gray,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 15px",fontSize:12.5,cursor:"pointer",fontFamily:F}}>Descartar</button>
+      </div>
+    </div>}
+  </FormSection>;
+}
+
+function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,config,setConfig}){
   const [tab,setTab]=useState("resumen");
   const [showReporte,setShowReporte]=useState(false);
   const [certPagoIdx,setCertPagoIdx]=useState(-1);
@@ -1998,6 +2219,9 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
 
   const upd=(f,v)=>setClients(prev=>prev.map(c=>c.id===client.id?{...c,[f]:v}:c));
   const updTax=(k,v)=>upd("taxes",{...client.taxes,[k]:v});
+  // Varios campos de una sola vez: la lectura de documentos escribe muchos juntos
+  // y hacerlo de a uno con upd() pisaría los anteriores.
+  const updVarios=(patch)=>setClients(prev=>prev.map(c=>c.id!==client.id?c:{...c,...patch,taxes:{...c.taxes,...(patch.taxes||{})}}));
   // Importe de un renglón del 2908 pisado a mano para este mes (vacío = vuelve al automático)
   const setAnticipo=(key,v)=>upd("anticipos",{...client.anticipos,[period]:{...(client.anticipos?.[period]||{}),[key]:v}});
   // Deja los doce meses del año con los anticipos fijos ya cargados. El IVA queda afuera:
@@ -2306,6 +2530,8 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           <CredRow label="FOCER" logo={null} credKey="focer" creds={client.credentials} onChange={updCred}/>
           <CredRow label="PIN FOCER" logo={null} credKey="pinFOCER" creds={client.credentials} onChange={updCred}/>
         </FormSection>
+
+        <LectorDocs client={client} updVarios={updVarios} period={period} config={config} setConfig={setConfig}/>
 
         {client.hasEmployees&&<EmpBlock client={client} upd={upd} addingEmp={addingEmp} setAddingEmp={setAddingEmp} newEmp={newEmp} setNewEmp={setNewEmp} addEmpF={addEmpF}/>}
       </div>}
@@ -2799,11 +3025,96 @@ function CalendarioView({clients,config,openClient,globalPeriod}){
 }
 
 // ─── CONFIG ───────────────────────────────────────────────────────
+// Cotizaciones del BCU: se cargan desde el Excel que publica el Banco Central
+// o a mano. Se guardan por fecha y moneda, y las usa la lectura de comprobantes
+// recibidos para pasar a pesos lo que viene en moneda extranjera.
+function CotizacionesPanel({config,setConfig}){
+  const {m:coM}=useR();
+  const cotiz=config.cotizaciones||[];
+  const [err,setErr]=useState("");
+  const [aviso,setAviso]=useState("");
+  const [nueva,setNueva]=useState({fecha:TODAY,moneda:"USD",venta:""});
+  const [verTodas,setVerTodas]=useState(false);
+  const ref=useRef();
+
+  const subir=async(file)=>{
+    if(!file)return;setErr("");setAviso("");
+    try{
+      const [{leerCotizacionesXLS,fusionarCotizaciones},XLSX]=await Promise.all([import("./lectores.js"),import("xlsx")]);
+      const wb=XLSX.read(new Uint8Array(await leerArchivo(file)),{type:"array"});
+      const filas=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false});
+      const leidas=leerCotizacionesXLS(filas);
+      if(!leidas.length)throw new Error("No encontré cotizaciones. El archivo del BCU tiene las columnas Moneda, Fecha, Venta, Compra y Arbitraje.");
+      const {lista,altas,cambios}=fusionarCotizaciones(cotiz,leidas);
+      setConfig(p=>({...p,cotizaciones:lista}));
+      setAviso(`${altas===1?"1 cotización nueva":`${altas} cotizaciones nuevas`}${cambios?` y ${cambios===1?"1 corregida":`${cambios} corregidas`}`:""}. En total hay ${lista.length}.`);
+    }catch(e){setErr(e.message||String(e));}
+    finally{if(ref.current)ref.current.value="";}
+  };
+
+  const agregar=async()=>{
+    const v=parseFloat(String(nueva.venta).replace(",","."));
+    if(!nueva.fecha||isNaN(v)||v<=0){setErr("Poné una fecha y un valor válido.");return;}
+    setErr("");
+    const {fusionarCotizaciones}=await import("./lectores.js");
+    const {lista}=fusionarCotizaciones(cotiz,[{fecha:nueva.fecha,moneda:nueva.moneda,venta:v,compra:v}]);
+    setConfig(p=>({...p,cotizaciones:lista}));
+    setAviso(`Cotización del ${nueva.fecha.split("-").reverse().join("/")} guardada.`);
+    setNueva(n=>({...n,venta:""}));
+  };
+  const borrar=(c)=>setConfig(p=>({...p,cotizaciones:(p.cotizaciones||[]).filter(x=>!(x.fecha===c.fecha&&x.moneda===c.moneda))}));
+
+  const visibles=verTodas?cotiz:cotiz.slice(0,12);
+  const ultima=cotiz.find(c=>c.moneda==="USD");
+
+  return<FormSection title="Cotizaciones del BCU" cols={1}>
+    {err&&<div style={{background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:8,padding:"9px 12px",fontSize:12,color:"#7F1D1D",fontFamily:F}}>{err}</div>}
+    {aviso&&<div style={{background:"#F0FDF4",border:"1px solid #86EFAC",borderRadius:8,padding:"9px 12px",fontSize:12,color:"#14532D",fontFamily:F,fontWeight:600}}>{aviso}</div>}
+    <div style={{fontSize:11.5,color:C.gray,fontFamily:F,lineHeight:1.55}}>
+      Sirven para pasar a pesos los comprobantes en moneda extranjera. Se aplica siempre la del día hábil
+      anterior al comprobante, que es la regla de DGI. Podés subir el Excel del BCU o cargar un valor suelto.
+    </div>
+    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+      <input ref={ref} type="file" accept=".xls,.xlsx,.csv" style={{display:"none"}} onChange={e=>subir(e.target.files?.[0])}/>
+      <button onClick={()=>ref.current?.click()} style={{background:C.blue,color:"#fff",border:"none",borderRadius:7,padding:"8px 15px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>Subir Excel del BCU</button>
+      <button onClick={()=>openUrl("https://www.bcu.gub.uy/Estadisticas-e-Indicadores/Paginas/Cotizaciones.aspx")} style={{background:"transparent",color:C.blue,border:`1px solid ${C.blue}40`,borderRadius:7,padding:"8px 15px",fontSize:12.5,cursor:"pointer",fontFamily:F}}>Ir al BCU ↗</button>
+      {ultima&&<span style={{fontSize:11.5,color:C.gray,fontFamily:F,marginLeft:"auto"}}>Última: dólar <b style={{color:C.navy}}>{fU(ultima.venta,4)}</b> del {ultima.fecha.split("-").reverse().join("/")}</span>}
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:coM?"1fr 1fr":"150px 130px 130px auto",gap:8,alignItems:"end"}}>
+      <div><label style={lbl}>Fecha</label><input type="date" value={nueva.fecha} onChange={e=>setNueva(n=>({...n,fecha:e.target.value}))} style={inp}/></div>
+      <div><label style={lbl}>Moneda</label><select value={nueva.moneda} onChange={e=>setNueva(n=>({...n,moneda:e.target.value}))} style={inp}>
+        {[["USD","Dólar"],["UI","Unidad Indexada"],["UR","Unidad Reajustable"],["EUR","Euro"],["BRL","Real"],["ARS","Peso argentino"]].map(([k,v])=><option key={k} value={k}>{v}</option>)}
+      </select></div>
+      <div><label style={lbl}>Valor</label><input value={nueva.venta} onChange={e=>setNueva(n=>({...n,venta:e.target.value}))} style={inp} placeholder="40,2030"/></div>
+      <button onClick={agregar} style={{background:C.ok,color:"#fff",border:"none",borderRadius:7,padding:"8px 15px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>Agregar</button>
+    </div>
+    {cotiz.length===0
+      ?<div style={{textAlign:"center",color:C.gray,fontSize:12,fontFamily:F,padding:"14px 0"}}>Todavía no hay cotizaciones cargadas.</div>
+      :<div>
+        <div style={{display:"grid",gridTemplateColumns:"110px 150px 1fr 34px",background:C.bg,padding:"6px 10px",borderRadius:"7px 7px 0 0",border:`1px solid ${C.border}`}}>
+          {["Fecha","Moneda","Valor",""].map((h,i)=><div key={i} style={{fontSize:10,color:C.gray,fontWeight:700,fontFamily:F,letterSpacing:.4,textAlign:i===2?"right":"left"}}>{h.toUpperCase()}</div>)}
+        </div>
+        <div style={{border:`1px solid ${C.border}`,borderTop:"none",borderRadius:"0 0 7px 7px",maxHeight:290,overflowY:"auto"}}>
+          {visibles.map((c,i)=><div key={c.fecha+c.moneda} style={{display:"grid",gridTemplateColumns:"110px 150px 1fr 34px",padding:"6px 10px",alignItems:"center",background:i%2?"#F8F9FC":C.white}}>
+            <div style={{fontSize:12,color:C.navy,fontFamily:F}}>{c.fecha.split("-").reverse().join("/")}</div>
+            <div style={{fontSize:12,color:C.gray,fontFamily:F}}>{c.moneda}</div>
+            <div style={{fontSize:12.5,color:C.navy,fontFamily:F,fontWeight:700,textAlign:"right",fontVariantNumeric:"tabular-nums"}}>{fU(c.venta,4)}</div>
+            <button onClick={()=>borrar(c)} title="Eliminar" style={{background:"transparent",border:"none",color:C.gray,cursor:"pointer",fontSize:13,justifySelf:"end"}}>✕</button>
+          </div>)}
+        </div>
+        {cotiz.length>12&&<button onClick={()=>setVerTodas(v=>!v)} style={{marginTop:7,background:"transparent",border:"none",color:C.blue,fontSize:11.5,cursor:"pointer",fontFamily:F,padding:0}}>
+          {verTodas?"Ver sólo las últimas 12":`Ver las ${cotiz.length} cotizaciones`}
+        </button>}
+      </div>}
+  </FormSection>;
+}
+
 function ConfigPanel({config,setConfig}){
   const set=(k,v)=>setConfig(p=>({...p,[k]:v}));
   return<div style={{padding:22}}>
     <h1 style={{margin:"0 0 18px",fontSize:19,fontWeight:700,color:C.navy,fontFamily:F}}>Configuración</h1>
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <CotizacionesPanel config={config} setConfig={setConfig}/>
       <FormSection title="Datos del estudio">
         <div><label style={lbl}>Nombre del estudio</label><input value={config.studioName} onChange={e=>set("studioName",e.target.value)} style={inp}/></div>
         <div><label style={lbl}>Código del estudio (aparece en encabezado)</label><input value={config.studioCode||""} onChange={e=>set("studioCode",e.target.value)} style={inp} placeholder="VCEstudio"/></div>
@@ -2982,7 +3293,7 @@ export default function Obligo(){
   const [closedPeriods,setClosedPeriods]=useState([]);
   const [proveedores,setProveedores]=useState([]);
   // Valores fiscales vigentes 2026, los mismos que usa el otro estudio
-  const CONFIG_DEFAULT={studioName:"Estudio Valeria Calvette",studioCode:"VCEstudio",studioRut:"",studioEmail:"",studioPhone:"",adminPass:"admin123",secretariaPass:"secr123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000};
+  const CONFIG_DEFAULT={studioName:"Estudio Valeria Calvette",studioCode:"VCEstudio",studioRut:"",studioEmail:"",studioPhone:"",adminPass:"admin123",secretariaPass:"secr123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000,cotizaciones:[]};
   const [config,setConfig]=useState(()=>{
     try{const s=localStorage.getItem('gc_config');if(s)return{...CONFIG_DEFAULT,...JSON.parse(s)};}catch(e){}
     return CONFIG_DEFAULT;
@@ -3004,7 +3315,7 @@ export default function Obligo(){
       if(!seedOk){
         const byId={};lsC.forEach(c=>{byId[c.id]=c;});
         lsC=CLIENTS_LASER.map(seed=>{const old=byId[seed.id];if(!old)return seed;
-          return{...seed,sueldos:old.sueldos||{},tramites:old.tramites||[],nominas:old.nominas||{},billing:old.billing||{},facturas:old.facturas||{},boletos:old.boletos||{},anticipos:old.anticipos||{},obPagos:old.obPagos||{},incidencias:old.incidencias||[],certsDGI:old.certsDGI||[],credentials:old.credentials||seed.credentials,studyFee:old.studyFee,studyFeePaid:old.studyFeePaid,notes:seed.notes};
+          return{...seed,sueldos:old.sueldos||{},tramites:old.tramites||[],nominas:old.nominas||{},billing:old.billing||{},facturas:old.facturas||{},boletos:old.boletos||{},anticipos:old.anticipos||{},obPagos:old.obPagos||{},aportaciones:old.aportaciones||[],docsLeidos:old.docsLeidos||[],incidencias:old.incidencias||[],certsDGI:old.certsDGI||[],credentials:old.credentials||seed.credentials,studyFee:old.studyFee,studyFeePaid:old.studyFeePaid,notes:seed.notes};
         }).concat(lsC.filter(c=>!CLIENTS_LASER.some(s=>s.id===c.id)));
         lsCfg={...lsCfg,bpc:LASER_CONFIG_DEFAULT.bpc,ui:LASER_CONFIG_DEFAULT.ui,salarioMinimo:LASER_CONFIG_DEFAULT.salarioMinimo,ivaMinimo:LASER_CONFIG_DEFAULT.ivaMinimo,iraeMinimoMensual:LASER_CONFIG_DEFAULT.iraeMinimoMensual};
         try{localStorage.setItem('ls_seed',LASER_SEED_V);localStorage.setItem('ls_clients',JSON.stringify(lsC));localStorage.setItem('ls_config',JSON.stringify(lsCfg));}catch(e){}
@@ -3092,7 +3403,7 @@ export default function Obligo(){
       <div style={{flex:1,overflowY:"auto"}}>
         {view==="dashboard"&&<Dashboard clients={clients} setClients={setClients} setView={setView} openClient={openClient} user={authUser} proveedores={proveedores} setProveedores={setProveedores} period={globalPeriod} setPeriod={setGlobalPeriod} config={config}/>}
         {view==="clients"&&<ClientList clients={clients} openClient={openClient} onNew={addClient} period={globalPeriod} config={config}/>}
-        {view==="client"&&client&&<ClientDetail client={client} clients={clients} setClients={setClients} goBack={goBack} user={authUser} period={globalPeriod} setPeriod={setGlobalPeriod} config={config}/>}
+        {view==="client"&&client&&<ClientDetail client={client} clients={clients} setClients={setClients} goBack={goBack} user={authUser} period={globalPeriod} setPeriod={setGlobalPeriod} config={config} setConfig={setConfig}/>}
         {view==="tareas"&&<TasksModule clients={clients} setClients={setClients} period={globalPeriod} user={authUser}/>}
         {view==="alertas"&&<AlertsCenter clients={clients}/>}
         {view==="calendario"&&<CalendarioView clients={clients} config={config} openClient={openClient} globalPeriod={globalPeriod}/>}
