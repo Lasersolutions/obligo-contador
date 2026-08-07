@@ -1981,20 +1981,23 @@ function buildLineasEmpresa(c,period,config,conHonorarios){
   const cargados=(c.boletos||{})[period]||{};
   const impCargado=(id)=>{const g=cargados[id]||{};return g.monto!=null&&g.monto!==""?+g.monto:null;};
   const vtoCargado=(id,def)=>{const g=cargados[id]||{};return g.vto?isoAFecha(g.vto):def;};
+  // El número de referencia del boleto: es con lo que la empresa lo paga
+  const refCargada=(id)=>((cargados[id]||{}).ref||"").trim();
+  const refDGI=refCargada("dgi");
   const dgiDue=vtoCargado("dgi",vtoDGI(period,config?.diaDGI,c.grupoDGI));
   const bpsDue=vtoBPS(period,config?.diaBPS);
   const calc=calcAnticipos(c,period,config);
   // Los importes salen del mismo boleto 2908 que ve el estudio, con los ajustes a mano incluidos
   const b2908=calc2908(c,config,period);
   const mt=(k)=>{const it=b2908.items.find(i=>i.key===k);return it?it.monto:null;};
-  if(t.iva==="minimo")lines.push({org:"DGI",label:"IVA Mínimo (Literal E) — Form. 2908",due:dgiDue,amount:mt("ivaMin")});
-  if(t.iva==="basica"||t.iva==="reducida")lines.push({org:"DGI",label:`IVA ${t.iva==="basica"?"tasa básica 22%":"tasa reducida 10%"} — DJ 2178`+(calc.excedente>0?` (mes sin pago, excedente de $ ${fU(calc.excedente,2)})`:""),due:dgiDue,amount:calc.cargado?mt("iva"):null});
-  if(t.iva==="sp")lines.push({org:"DGI",label:"IVA Servicios Personales — Form. 1302",due:dgiDue,amount:null});
-  if(t.iva==="monotributo")lines.push({org:"BPS",label:"Cuota Monotributo unificada",due:vtoCargado("bps",bpsDue),amount:impCargado("bps")});
-  if(t.renta==="irae")lines.push({org:"DGI",label:`Anticipo IRAE${t.iraeEsFicto?" (régimen ficto)":""}`,due:dgiDue,amount:mt("irae")});
-  if(t.renta==="irpf_cat2")lines.push({org:"DGI",label:"Anticipo IRPF Cat. II — servicios personales",due:dgiDue,amount:mt("irpf")});
-  if(t.patrimonio)lines.push({org:"DGI",label:"Anticipo Impuesto al Patrimonio",due:dgiDue,amount:mt("ip")});
-  if(c.entityType==="sa")lines.push({org:"DGI",label:"ICOSA mensual",due:dgiDue,amount:mt("icosa")});
+  if(t.iva==="minimo")lines.push({org:"DGI",label:"IVA Mínimo (Literal E) — Form. 2908",due:dgiDue,ref:refDGI,amount:mt("ivaMin")});
+  if(t.iva==="basica"||t.iva==="reducida")lines.push({org:"DGI",label:`IVA ${t.iva==="basica"?"tasa básica 22%":"tasa reducida 10%"} — DJ 2178`+(calc.excedente>0?` (mes sin pago, excedente de $ ${fU(calc.excedente,2)})`:""),due:dgiDue,ref:refDGI,amount:calc.cargado?mt("iva"):null});
+  if(t.iva==="sp")lines.push({org:"DGI",label:"IVA Servicios Personales — Form. 1302",due:dgiDue,ref:refDGI,amount:null});
+  if(t.iva==="monotributo")lines.push({org:"BPS",label:"Cuota Monotributo unificada",due:vtoCargado("bps",bpsDue),ref:refCargada("bps"),amount:impCargado("bps")});
+  if(t.renta==="irae")lines.push({org:"DGI",label:`Anticipo IRAE${t.iraeEsFicto?" (régimen ficto)":""}`,due:dgiDue,ref:refDGI,amount:mt("irae")});
+  if(t.renta==="irpf_cat2")lines.push({org:"DGI",label:"Anticipo IRPF Cat. II — servicios personales",due:dgiDue,ref:refDGI,amount:mt("irpf")});
+  if(t.patrimonio)lines.push({org:"DGI",label:"Anticipo Impuesto al Patrimonio",due:dgiDue,ref:refDGI,amount:mt("ip")});
+  if(c.entityType==="sa")lines.push({org:"DGI",label:"ICOSA mensual",due:dgiDue,ref:refDGI,amount:mt("icosa")});
   // El 2908 se edita renglón por renglón en Tributario, así que el detalle de DGI
   // ya viene con los ajustes. Si además se cargó el boleto entero y no cuadra con
   // ese detalle, manda el boleto y la diferencia va a la vista.
@@ -2002,7 +2005,7 @@ function buildLineasEmpresa(c,period,config,conHonorarios){
   if(dgiTot!=null){
     const sumaDGI=lines.filter(l=>l.org==="DGI").reduce((a,l)=>a+(+l.amount||0),0);
     const dif=Math.round((dgiTot-sumaDGI)*100)/100;
-    if(Math.abs(dif)>=1)lines.push({org:"DGI",label:"Ajuste según el boleto 2908 emitido",due:dgiDue,amount:dif});
+    if(Math.abs(dif)>=1)lines.push({org:"DGI",label:"Ajuste según el boleto 2908 emitido",due:dgiDue,ref:refDGI,amount:dif});
   }
   // BPS no se arma por concepto: el importe sale del boleto que carga el estudio.
   // Sin boleto cargado se muestra lo que da la liquidación de sueldos.
@@ -2020,7 +2023,7 @@ function buildLineasEmpresa(c,period,config,conHonorarios){
     if(b.id==="bps"&&conDirector)detalle.push("FONASA director/a titular");
     if(cargado==null&&+b.auto>0&&nEmp)detalle.push("según liquidación");
     lines.push({org:"BPS",label:(b.id==="bps"?"Aportes BPS del mes":b.label)+(detalle.length?` (${detalle.join(", ")})`:""),
-      due:vtoCargado(b.id,bpsDue),amount:monto});
+      due:vtoCargado(b.id,bpsDue),ref:refCargada(b.id),amount:monto});
   });
   if(c.efactura==="activo")lines.push({org:"DGI",label:"Facturación electrónica: emisor activo — sin pago, control de CFE al día",due:"",amount:null});
   if(c.efactura==="pendiente")lines.push({org:"DGI",label:"Facturación electrónica: ALTA PENDIENTE de gestionar",due:"",amount:null});
@@ -2045,18 +2048,35 @@ function generarReportePDF(empresas,period,config,notaGeneral){
   const B=marcaEstudio();
   const tot=empresas.reduce((a,e)=>a+e.lines.reduce((x,l)=>x+(+l.amount||0),0),0);
   const orgColor={DGI:"#B91C1C",BPS:"#1D4ED8",BSE:"#B45309",Estudio:B.acento,Otro:"#475569"};
+  // Los renglones de un mismo boleto comparten número: se dibuja una sola celda
+  // que los abarca, como en el papel del organismo.
+  const spanRef=(lines)=>{
+    const sp=new Array(lines.length).fill(1);
+    let i=0;
+    while(i<lines.length){
+      const r=(lines[i].ref||"").trim();
+      let j=i;
+      if(r)while(j+1<lines.length&&((lines[j+1].ref||"").trim())===r)j++;
+      sp[i]=j-i+1;
+      for(let k=i+1;k<=j;k++)sp[k]=0;
+      i=j+1;
+    }
+    return sp;
+  };
+  const hayRef=empresas.some(e=>e.lines.some(l=>(l.ref||"").trim()));
   const secciones=empresas.map(({client,lines,nota})=>{
     const sub=lines.reduce((x,l)=>x+(+l.amount||0),0);
+    const sp=spanRef(lines);
     return`<div class="empresa">
       <div class="emp-head"><div class="emp-nom">${client.name}</div><div class="emp-meta">${client.rut?`RUT ${client.rut}`:""}${client.numEmpresa?` · BPS ${client.numEmpresa}`:""}</div></div>
       <table>
-        <thead><tr><th style="width:60px">Org.</th><th>Concepto</th><th style="width:90px">Vencimiento</th><th style="width:110px;text-align:right">Importe</th></tr></thead>
-        <tbody>${lines.map(l=>`<tr>
+        <thead><tr><th style="width:60px">Org.</th><th>Concepto</th>${hayRef?`<th style="width:96px">Boleto Nº</th>`:""}<th style="width:90px">Vencimiento</th><th style="width:110px;text-align:right">Importe</th></tr></thead>
+        <tbody>${lines.map((l,i)=>`<tr>
           <td><span class="org" style="background:${(orgColor[l.org]||orgColor.Otro)}15;color:${orgColor[l.org]||orgColor.Otro};border-color:${(orgColor[l.org]||orgColor.Otro)}40">${l.org}</span></td>
-          <td>${l.label}</td><td>${l.due||"—"}</td>
+          <td>${l.label}</td>${hayRef?(sp[i]?`<td class="ref" rowspan="${sp[i]}">${(l.ref||"").trim()||"—"}</td>`:""):""}<td>${l.due||"—"}</td>
           <td class="num">${l.amount!=null&&l.amount!==""?"$ "+fU(+l.amount,2):"—"}</td></tr>`).join("")}
         </tbody>
-        <tfoot><tr><td colspan="3">Subtotal ${client.name}</td><td class="num">$ ${fU(sub,2)}</td></tr></tfoot>
+        <tfoot><tr><td colspan="${hayRef?4:3}">Subtotal ${client.name}</td><td class="num">$ ${fU(sub,2)}</td></tr></tfoot>
       </table>
       ${nota?`<div class="nota"><b>Nota:</b> ${nota}</div>`:""}
     </div>`;
@@ -2080,6 +2100,7 @@ function generarReportePDF(empresas,period,config,notaGeneral){
     th{font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:#7a87a6;text-align:left;padding:6px 10px;background:${B.fondo};border-bottom:1px solid ${B.borde}}
     td{padding:6.5px 10px;border-bottom:1px solid #EDF1F9;vertical-align:middle}
     .org{display:inline-block;border:1px solid;border-radius:99px;padding:1px 9px;font-size:9.5px;font-weight:800}
+    .ref{font-family:'IBM Plex Mono',ui-monospace,Consolas,monospace;font-size:10.5px;color:${B.navy};border-left:1px solid #EDF1F9;border-right:1px solid #EDF1F9;background:${B.fondo}66}
     .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
     tfoot td{background:${B.fondo};font-weight:800;color:${B.navy};border-top:2px solid ${B.navy}}
     .nota{background:#FFFBEB;border:1px solid #FDE68A;border-radius:0 0 8px 8px;padding:7px 11px;font-size:10.5px;color:#78350F}
@@ -2135,7 +2156,7 @@ function ReporteModal({clients,initialIds,period,config,onClose}){
   const conHonorario=Object.keys(sel).filter(id=>{const c=clients.find(x=>x.id===+id);return c&&+c.studyFee>0;}).length;
   const updLine=(cid,i,patch)=>setSel(p=>({...p,[cid]:{...p[cid],lines:p[cid].lines.map((l,j)=>j===i?{...l,...patch}:l)}}));
   const delLine=(cid,i)=>setSel(p=>({...p,[cid]:{...p[cid],lines:p[cid].lines.filter((_,j)=>j!==i)}}));
-  const addLine=(cid)=>setSel(p=>({...p,[cid]:{...p[cid],lines:[...p[cid].lines,{org:"DGI",label:"",due:"",amount:null}]}}));
+  const addLine=(cid)=>setSel(p=>({...p,[cid]:{...p[cid],lines:[...p[cid].lines,{org:"DGI",label:"",due:"",ref:"",amount:null}]}}));
   const generar=()=>{
     const empresas=Object.keys(sel).map(id=>({client:clients.find(c=>c.id===+id),lines:sel[id].lines.filter(l=>l.label),nota:sel[id].nota}));
     if(!empresas.length)return;
@@ -2171,6 +2192,7 @@ function ReporteModal({clients,initialIds,period,config,onClose}){
               {s.lines.map((l,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:5,alignItems:"center",flexWrap:rpM?"wrap":"nowrap"}}>
                 <select value={l.org} onChange={e=>updLine(+id,i,{org:e.target.value})} style={{...inp,width:64,padding:"4px 5px",fontSize:11}}><option>DGI</option><option>BPS</option><option>BSE</option><option>Estudio</option><option>Otro</option></select>
                 <input value={l.label} onChange={e=>updLine(+id,i,{label:e.target.value})} placeholder="Concepto" style={{...inp,flex:1,minWidth:140,padding:"4px 7px",fontSize:11.5}}/>
+                <input value={l.ref||""} onChange={e=>updLine(+id,i,{ref:e.target.value})} placeholder="Boleto Nº" style={{...inp,width:88,padding:"4px 6px",fontSize:11,fontFamily:FN}}/>
                 <input value={l.due} onChange={e=>updLine(+id,i,{due:e.target.value})} placeholder="dd/mm/aaaa" style={{...inp,width:88,padding:"4px 6px",fontSize:11}}/>
                 <input type="number" value={l.amount??""} onChange={e=>updLine(+id,i,{amount:e.target.value===""?null:+e.target.value})} placeholder="$" style={{...inp,width:96,padding:"4px 6px",fontSize:11.5,textAlign:"right"}}/>
                 <button onClick={()=>delLine(+id,i)} style={{background:C.red+"10",border:`1px solid ${C.red}30`,color:C.red,borderRadius:6,width:24,height:24,cursor:"pointer",fontSize:11,flexShrink:0}}>×</button>
