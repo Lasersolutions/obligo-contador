@@ -1953,7 +1953,13 @@ function SueldosModule({client,upd,period,config}){
 // Arma las líneas de obligaciones del mes según el régimen del cliente; los montos se pueden editar antes de generar
 function buildLineasEmpresa(c,period,config){
   const t=c.taxes||{};const lines=[];
-  const dgiDue=`${String(config?.diaDGI||22).padStart(2,"0")}/${nextP(period)}`;
+  // Si el estudio ya cargó el boleto en Pagos / trámites, ese importe y ese
+  // vencimiento son los que van al reporte: es el papel que el cliente tiene
+  // en la mano. Recién si no hay boleto cargado se muestra lo calculado.
+  const cargados=(c.boletos||{})[period]||{};
+  const impCargado=(id)=>{const g=cargados[id]||{};return g.monto!=null&&g.monto!==""?+g.monto:null;};
+  const vtoCargado=(id,def)=>{const g=cargados[id]||{};return g.vto?isoAFecha(g.vto):def;};
+  const dgiDue=vtoCargado("dgi",`${String(config?.diaDGI||22).padStart(2,"0")}/${nextP(period)}`);
   const bpsDue=`${String(config?.diaBPS||10).padStart(2,"0")}/${nextP(period)}`;
   const calc=calcAnticipos(c,period,config);
   // Los importes salen del mismo boleto 2908 que ve el estudio, con los ajustes a mano incluidos
@@ -1962,16 +1968,38 @@ function buildLineasEmpresa(c,period,config){
   if(t.iva==="minimo")lines.push({org:"DGI",label:"IVA Mínimo (Literal E) — Form. 2908",due:dgiDue,amount:mt("ivaMin")});
   if(t.iva==="basica"||t.iva==="reducida")lines.push({org:"DGI",label:`IVA ${t.iva==="basica"?"tasa básica 22%":"tasa reducida 10%"} — DJ 2178`+(calc.excedente>0?` (mes sin pago, excedente de $ ${fU(calc.excedente,2)})`:""),due:dgiDue,amount:calc.cargado?mt("iva"):null});
   if(t.iva==="sp")lines.push({org:"DGI",label:"IVA Servicios Personales — Form. 1302",due:dgiDue,amount:null});
-  if(t.iva==="monotributo")lines.push({org:"BPS",label:"Cuota Monotributo unificada",due:bpsDue,amount:null});
+  if(t.iva==="monotributo")lines.push({org:"BPS",label:"Cuota Monotributo unificada",due:vtoCargado("bps",bpsDue),amount:impCargado("bps")});
   if(t.renta==="irae")lines.push({org:"DGI",label:`Anticipo IRAE${t.iraeEsFicto?" (régimen ficto)":""}`,due:dgiDue,amount:mt("irae")});
   if(t.renta==="irpf_cat2")lines.push({org:"DGI",label:"Anticipo IRPF Cat. II — servicios personales",due:dgiDue,amount:mt("irpf")});
   if(t.patrimonio)lines.push({org:"DGI",label:"Anticipo Impuesto al Patrimonio",due:dgiDue,amount:mt("ip")});
   if(c.entityType==="sa")lines.push({org:"DGI",label:"ICOSA mensual",due:dgiDue,amount:mt("icosa")});
-  if(c.hasEmployees&&(c.employees||[]).length){
-    const tot=aportesBPS(c,period,config);
-    lines.push({org:"BPS",label:`Aportes BPS nómina (${(c.employees||[]).length} empleado${(c.employees||[]).length!==1?"s":""}, según liquidación)`,due:bpsDue,amount:tot>0?tot:null});
+  // El 2908 se edita renglón por renglón en Tributario, así que el detalle de DGI
+  // ya viene con los ajustes. Si además se cargó el boleto entero y no cuadra con
+  // ese detalle, manda el boleto y la diferencia va a la vista.
+  const dgiTot=impCargado("dgi");
+  if(dgiTot!=null){
+    const sumaDGI=lines.filter(l=>l.org==="DGI").reduce((a,l)=>a+(+l.amount||0),0);
+    const dif=Math.round((dgiTot-sumaDGI)*100)/100;
+    if(Math.abs(dif)>=1)lines.push({org:"DGI",label:"Ajuste según el boleto 2908 emitido",due:dgiDue,amount:dif});
   }
-  if(c.entityType==="sas"||c.entityType==="sa")lines.push({org:"BPS",label:"FONASA director/a titular",due:bpsDue,amount:null});
+  // BPS no se arma por concepto: el importe sale del boleto que carga el estudio.
+  // Sin boleto cargado se muestra lo que da la liquidación de sueldos.
+  const nEmp=(c.employees||[]).length;
+  const conDirector=c.entityType==="sas"||c.entityType==="sa";
+  boletosDe(c,period,config).filter(b=>b.org==="BPS").forEach(b=>{
+    if(b.id==="bps"&&t.iva==="monotributo")return; // ya está la línea del monotributo
+    const cargado=impCargado(b.id);
+    const monto=cargado!=null?cargado:(+b.auto>0?+b.auto:null);
+    const detalle=[];
+    // La nómina va en la factura de Industria y Comercio (o en la única, si hay
+    // una sola). El FONASA del director/a viaja en su propia factura cuando el
+    // cliente tiene las dos.
+    if(b.id!=="bps_fonasa"&&nEmp)detalle.push(`${nEmp} empleado${nEmp!==1?"s":""}`);
+    if(b.id==="bps"&&conDirector)detalle.push("FONASA director/a titular");
+    if(cargado==null&&+b.auto>0&&nEmp)detalle.push("según liquidación");
+    lines.push({org:"BPS",label:(b.id==="bps"?"Aportes BPS del mes":b.label)+(detalle.length?` (${detalle.join(", ")})`:""),
+      due:vtoCargado(b.id,bpsDue),amount:monto});
+  });
   if(c.efactura==="activo")lines.push({org:"DGI",label:"Facturación electrónica: emisor activo — sin pago, control de CFE al día",due:"",amount:null});
   if(c.efactura==="pendiente")lines.push({org:"DGI",label:"Facturación electrónica: ALTA PENDIENTE de gestionar",due:"",amount:null});
   return lines;
