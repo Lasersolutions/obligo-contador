@@ -422,6 +422,41 @@ const LASER_SEED_V="6";
 
 // ─── ETIQUETAS ESPECIALES (Solo Web / Solo Marketing / Convenio pendiente) ───
 const SPECIAL_TAG_COLOR={"Solo Web":"#2948D9","Solo Marketing":"#8E44AD","Convenio pendiente":"#D97706"};
+// ─── ICONOS ───────────────────────────────────────────────────────
+// Trazo de 1,5px al tono del texto, como pide el sistema de diseño. Van
+// dibujados acá adentro y no como emoji: el emoji cambia de dibujo en cada
+// sistema operativo, no toma el color de la marca y le baja el tono a la app.
+const ICONOS={
+  panel:<><rect x="3.8" y="3.8" width="6.6" height="6.6" rx="1.6"/><rect x="13.6" y="3.8" width="6.6" height="6.6" rx="1.6"/><rect x="3.8" y="13.6" width="6.6" height="6.6" rx="1.6"/><rect x="13.6" y="13.6" width="6.6" height="6.6" rx="1.6"/></>,
+  clientes:<><path d="M3 21h18"/><path d="M5.5 21V6.2l7-2.7v17.5"/><path d="M12.5 9.6h5a1 1 0 0 1 1 1V21"/><path d="M8.2 8.4h1M8.2 12.2h1M8.2 16h1"/><path d="M15 13.4h1M15 17.2h1"/></>,
+  tareas:<><path d="M3.4 6.6l1.8 1.8 3.2-3.6"/><path d="M3.4 15.9l1.8 1.8 3.2-3.6"/><path d="M11.6 6.6H21"/><path d="M11.6 15.9H21"/></>,
+  alertas:<><path d="M6.2 9.4a5.8 5.8 0 0 1 11.6 0c0 3.7 1.3 5.2 1.9 5.9H4.3c.6-.7 1.9-2.2 1.9-5.9Z"/><path d="M10.1 18.9a2 2 0 0 0 3.8 0"/></>,
+  calendario:<><rect x="3.6" y="5.6" width="16.8" height="14.8" rx="2"/><path d="M3.6 10.1h16.8"/><path d="M8.3 3.6v4M15.7 3.6v4"/></>,
+  config:<><path d="M4 7.2h9.4M17.6 7.2H20"/><path d="M4 12h2.4M10.6 12H20"/><path d="M4 16.8h7.4M15.6 16.8H20"/><circle cx="15.6" cy="7.2" r="2.1"/><circle cx="8.6" cy="12" r="2.1"/><circle cx="13.6" cy="16.8" r="2.1"/></>,
+  documento:<><path d="M13.4 3.4H6.8a1.6 1.6 0 0 0-1.6 1.6v14a1.6 1.6 0 0 0 1.6 1.6h10.4a1.6 1.6 0 0 0 1.6-1.6V8.6Z"/><path d="M13.4 3.4v5.2h5.4"/><path d="M8.6 13h6.8M8.6 16.6h4.6"/></>,
+  ajustes:<><path d="M5.6 20.4V14M5.6 10V3.6M12 20.4v-9.2M12 7.2V3.6M18.4 20.4v-4.6M18.4 11.8V3.6"/><path d="M3.2 14h4.8M9.6 7.2h4.8M16 11.8h4.8"/></>,
+  alerta:<><path d="M10.6 4.1 2.9 17.4a1.6 1.6 0 0 0 1.4 2.4h15.4a1.6 1.6 0 0 0 1.4-2.4L13.4 4.1a1.6 1.6 0 0 0-2.8 0Z"/><path d="M12 9.4v4.2M12 17h.01"/></>,
+  impresora:<><path d="M6.6 9.2V3.8h10.8v5.4"/><path d="M6.6 17.4H4.8A1.8 1.8 0 0 1 3 15.6v-4.6a1.8 1.8 0 0 1 1.8-1.8h14.4a1.8 1.8 0 0 1 1.8 1.8v4.6a1.8 1.8 0 0 1-1.8 1.8h-1.8"/><rect x="6.6" y="14.4" width="10.8" height="5.8" rx="1"/></>,
+  pantalla:<><rect x="2.8" y="4" width="18.4" height="12.4" rx="1.8"/><path d="M8.4 20.2h7.2M12 16.4v3.8"/></>,
+  enlace:<><path d="M9.6 14.4a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14.4 9.6a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></>,
+  recibo:<><path d="M4.6 3.4v17.2l2.6-1.6 2.6 1.6 2.6-1.6 2.6 1.6 2.6-1.6 2.6 1.6V3.4l-2.6 1.6-2.6-1.6-2.6 1.6-2.6-1.6-2.6 1.6Z"/><path d="M8.4 9.4h7.2M8.4 13.4h4.8"/></>,
+  grafico:<><path d="M3.4 20.6h17.2"/><path d="M6.6 20.6v-6M11 20.6v-10M15.4 20.6v-4M19.8 20.6v-13"/></>,
+  listo:<><circle cx="12" cy="12" r="8.6"/><path d="M8.4 12.2l2.6 2.6 4.6-5.2"/></>,
+  menu:<><path d="M4 6.6h16M4 12h16M4 17.4h16"/></>,
+  buscar:<><circle cx="10.8" cy="10.8" r="6.6"/><path d="M15.6 15.6 20.4 20.4"/></>,
+  descargar:<><path d="M12 3.6v11.6"/><path d="M7.6 11l4.4 4.4 4.4-4.4"/><path d="M4.2 19.4h15.6"/></>,
+  subir:<><path d="M12 20.4V8.8"/><path d="M7.6 13.2 12 8.8l4.4 4.4"/><path d="M4.2 4.6h15.6"/></>,
+  filas:<><path d="M3.6 6.4h16.8M3.6 12h16.8M3.6 17.6h16.8"/></>,
+  cuadros:<><rect x="3.8" y="3.8" width="7" height="7" rx="1.4"/><rect x="13.2" y="3.8" width="7" height="7" rx="1.4"/><rect x="3.8" y="13.2" width="7" height="7" rx="1.4"/><rect x="13.2" y="13.2" width="7" height="7" rx="1.4"/></>,
+  punto:<circle cx="12" cy="12" r="7"/>,
+};
+function Ico({n,size=18,style={},sw=1.6}){
+  return<svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={sw}
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{flexShrink:0,display:"block",...style}}>
+    {ICONOS[n]||ICONOS.punto}
+  </svg>;
+}
+
 function SpecialTag({tag,size=10}){
   if(!tag)return null;const col=SPECIAL_TAG_COLOR[tag]||C.gray;
   return<span style={{background:col+"14",color:col,border:`1px solid ${col}45`,padding:"1px 8px",borderRadius:99,fontSize:size,fontWeight:700,fontFamily:F,letterSpacing:.3,whiteSpace:"nowrap"}}>{tag}</span>;
@@ -473,8 +508,8 @@ function useVista(key,ini="tabla"){
 }
 function VistaToggle({v,setV}){
   return<div style={{display:"flex",border:`1px solid ${C.border}`,borderRadius:7,overflow:"hidden",flexShrink:0}}>
-    {[["tabla","☰","Ver en columnas"],["tarjetas","▦","Ver en tarjetas"]].map(([k,ic,tit])=>(
-      <button key={k} onClick={()=>setV(k)} title={tit} style={{background:v===k?C.blue:C.white,color:v===k?"#fff":C.gray,border:"none",padding:"6px 11px",fontSize:13,cursor:"pointer",fontFamily:F,lineHeight:1}}>{ic}</button>
+    {[["tabla","filas","Ver en columnas"],["tarjetas","cuadros","Ver en tarjetas"]].map(([k,ic,tit])=>(
+      <button key={k} onClick={()=>setV(k)} title={tit} aria-label={tit} style={{background:v===k?C.blue:C.white,color:v===k?"#fff":C.gray,border:"none",padding:"7px 11px",cursor:"pointer",fontFamily:F,lineHeight:1,display:"flex",alignItems:"center"}}><Ico n={ic} size={15}/></button>
     ))}
   </div>;
 }
@@ -497,12 +532,26 @@ function PeriodNav({period,setPeriod,inline}){
 const lbl={display:"block",fontSize:11,color:C.gray,fontWeight:600,marginBottom:4,fontFamily:F};
 const inp={width:"100%",padding:"7px 9px",border:`1px solid ${C.border}`,borderRadius:6,fontSize:13,fontFamily:F,boxSizing:"border-box",background:C.white,color:C.navy};
 
-function FormSection({title,children,cols=2}){
+// Cada sección se pliega y recuerda cómo la dejó cada usuario. Las que se
+// consultan de vez en cuando arrancan cerradas para que la ficha se lea de
+// un vistazo; `abierta` fija cuál es el estado inicial.
+function FormSection({title,children,cols=2,abierta=true,nota}){
   const {m}=useR();
+  const clave="obligo_sec_"+title.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"");
+  const [open,setOpen]=useState(()=>{try{const v=localStorage.getItem(clave);return v===null?abierta:v==="1";}catch(e){return abierta;}});
+  useEffect(()=>{try{localStorage.setItem(clave,open?"1":"0");}catch(e){}},[clave,open]);
   const gc=m?1:cols;
-  return<div style={{background:C.white,borderRadius:8,padding:16,boxShadow:"0 1px 3px #0001"}}>
-    <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:12,fontFamily:F,paddingBottom:8,borderBottom:`1px solid ${C.border}`}}>{title}</div>
-    <div style={{display:"grid",gridTemplateColumns:`repeat(${gc},1fr)`,gap:12}}>{children}</div>
+  return<div style={{background:C.white,borderRadius:10,boxShadow:"0 1px 3px #0001",overflow:"hidden"}}>
+    <button onClick={()=>setOpen(o=>!o)} aria-expanded={open}
+      style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:open?"14px 16px 11px":"14px 16px",background:"transparent",
+        border:"none",borderBottom:open?`1px solid ${C.border}`:"none",cursor:"pointer",textAlign:"left",fontFamily:F}}>
+      <span style={{color:C.gray,display:"flex",transform:open?"rotate(90deg)":"none",transition:"transform .15s"}}>
+        <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+      </span>
+      <span style={{fontWeight:600,color:C.navy,fontSize:13,fontFamily:F}}>{title}</span>
+      {nota&&<span style={{fontSize:11.5,color:C.gray,fontFamily:F}}>{nota}</span>}
+    </button>
+    {open&&<div style={{display:"grid",gridTemplateColumns:`repeat(${gc},1fr)`,gap:12,padding:"14px 16px 16px"}}>{children}</div>}
   </div>;
 }
 function FRow({label,value,editable,onChange,placeholder,type="text",full,logo}){
@@ -635,7 +684,7 @@ function LoginScreen({onLogin}){
 // ─── SIDEBAR ──────────────────────────────────────────────────────
 function Sidebar({view,setView,user,onLogout}){
   const {m,open,setOpen}=useR();
-  const nav=[{id:"dashboard",l:"Panel Principal",ic:"📊"},{id:"clients",l:"Clientes",ic:"👥"},{id:"tareas",l:"Tareas",ic:"✅"},{id:"alertas",l:"Alertas",ic:"🔔"},{id:"calendario",l:"Calendario",ic:"📅"},{id:"config",l:"Configuración",ic:"⚙️"}];
+  const nav=[{id:"dashboard",l:"Panel Principal",ic:"panel"},{id:"clients",l:"Clientes",ic:"clientes"},{id:"tareas",l:"Tareas",ic:"tareas"},{id:"alertas",l:"Alertas",ic:"alertas"},{id:"calendario",l:"Calendario",ic:"calendario"},{id:"config",l:"Configuración",ic:"config"}];
   if(m&&!open)return null;
   const navClick=(id)=>{setView(id);if(m)setOpen(false);};
   return<>
@@ -660,7 +709,7 @@ function Sidebar({view,setView,user,onLogout}){
       <nav style={{flex:1,paddingTop:10,display:"flex",flexDirection:"column",gap:3,padding:"10px 9px 0"}}>
         {nav.map(item=>{const active=view===item.id;return<button key={item.id} onClick={()=>navClick(item.id)} style={{width:"100%",textAlign:"left",padding:"10px 13px",background:active?C.blue:"transparent",border:"none",borderLeft:active&&ACTIVE_STUDIO!=="laser"?`3px solid ${VC_GOLD}`:"3px solid transparent",borderRadius:9,color:active?"#fff":"#8FA8CE",cursor:"pointer",fontSize:13.5,fontWeight:active?700:500,fontFamily:F,display:"flex",alignItems:"center",gap:10,transition:"background .12s",boxShadow:active?"0 4px 14px #1D4ED844":"none"}}
           onMouseEnter={e=>{if(!active)e.currentTarget.style.background="#ffffff0d";}} onMouseLeave={e=>{if(!active)e.currentTarget.style.background="transparent";}}>
-          <span style={{fontSize:16,width:20,textAlign:"center",filter:active?"none":"grayscale(35%)"}}>{item.ic}</span>{item.l}
+          <Ico n={item.ic} size={17} style={{opacity:active?1:.72}}/>{item.l}
         </button>;})}
       </nav>
       {ACTIVE_STUDIO!=="laser"&&<div style={{padding:"0 14px 10px",fontSize:9.5,color:"#8FA8CE",fontFamily:F,fontStyle:"italic",lineHeight:1.4,opacity:.85}}>Normativa clara.<br/>Decisiones seguras.</div>}
@@ -854,7 +903,7 @@ function Dashboard({clients,setClients,setView,openClient,user,proveedores,setPr
     </div>
 
     {clientsWithPrevPending.length>0&&<div style={{background:"#FFF7ED",border:"1px solid #FED7AA",borderRadius:8,padding:12,marginBottom:10,fontFamily:F,display:"flex",alignItems:"center",gap:9}}>
-      <span style={{fontSize:18}}>⚠</span>
+      <span style={{color:"#B45309",display:"flex"}}><Ico n="alerta" size={17}/></span>
       <div><span style={{fontWeight:600,color:"#9A3412",fontSize:13}}>Tareas pendientes del mes anterior ({prevPeriod}) en {clientsWithPrevPending.length} cliente{clientsWithPrevPending.length!==1?"s":""}:</span>{" "}
       <span style={{fontSize:12,color:"#78350F"}}>{clientsWithPrevPending.slice(0,4).map(c=>c.name).join(", ")}{clientsWithPrevPending.length>4?"…":""}</span></div>
     </div>}
@@ -1142,7 +1191,7 @@ function ClientList({clients,openClient,onNew,period,config}){
       <h1 style={{margin:0,fontSize:19,fontWeight:700,color:C.navy,fontFamily:F}}>Clientes <span style={{fontSize:13,color:C.gray,fontWeight:400}}>({clients.length})</span></h1>
       <div style={{display:"flex",gap:8,alignItems:"center"}}>
         <VistaToggle v={vista} setV={setVista}/>
-        <button onClick={()=>setShowRep(true)} title="Armar un reporte con una o varias empresas" style={{background:"transparent",color:C.navy,border:`1px solid ${C.border}`,borderRadius:6,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F}}>📄 Reporte</button>
+        <button onClick={()=>setShowRep(true)} title="Armar un reporte con una o varias empresas" style={{background:"transparent",color:C.navy,border:`1px solid ${C.border}`,borderRadius:6,padding:"8px 14px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:6}}><Ico n="documento" size={14}/>Reporte</button>
         <button onClick={()=>setShowModal(true)} style={{background:C.blue,color:C.white,border:"none",borderRadius:6,padding:"8px 16px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:F}}>+ Nuevo cliente</button>
       </div>
     </div>
@@ -1560,7 +1609,7 @@ function AumentoModal({client,onClose,onApply}){
     <div onClick={e=>e.stopPropagation()} style={{background:C.white,borderRadius:14,width:720,maxWidth:"100%",maxHeight:"92vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 20px 60px #00002050",fontFamily:F}}>
       <div style={{background:C.navy,padding:"13px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
-          <div style={{color:"#fff",fontWeight:800,fontSize:15}}>📈 Aumento por Consejo de Salarios</div>
+          <div style={{color:"#fff",fontWeight:800,fontSize:15,display:"flex",alignItems:"center",gap:6}}><Ico n="grafico" size={16}/>Aumento por Consejo de Salarios</div>
           <div style={{color:"#8ECBDE",fontSize:11,marginTop:2}}>{conv?conv.nombre:"Sin convenio precargado para este grupo — usá el porcentaje manual."}</div>
         </div>
         <button onClick={onClose} style={{background:"#ffffff14",border:"1px solid #ffffff25",color:"#8ECBDE",borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:15}}>✕</button>
@@ -1584,7 +1633,7 @@ function AumentoModal({client,onClose,onApply}){
         </div>}
         <div style={{background:"#EFF6FF",border:`1px solid ${C.blue}33`,borderRadius:9,padding:"8px 12px",fontSize:11.5,color:C.navy,marginBottom:11,lineHeight:1.5}}>
           El aumento rige desde <b>{vig||"—"}</b>. Los recibos de meses anteriores se siguen liquidando con el sueldo viejo, así que no se altera nada de lo ya cerrado.
-          {yaAplicado&&<div style={{color:C.warn,fontWeight:700,marginTop:4}}>⚠ Ya hay empleados con un ajuste vigente desde {vig}. Si lo aplicás de nuevo, el aumento se suma otra vez.</div>}
+          {yaAplicado&&<div style={{color:C.warn,fontWeight:700,marginTop:4}}>Ya hay empleados con un ajuste vigente desde {vig}. Si lo aplicás de nuevo, el aumento se suma otra vez.</div>}
         </div>
         <div style={{background:C.white,borderRadius:9,border:`1px solid ${C.border}`,overflow:"hidden"}}>
           <div style={{display:"grid",gridTemplateColumns:auM?"1.6fr .8fr .8fr":`2fr ${nivelesConv.length>1?"90px ":""}1fr 1fr 1fr`,background:C.navy,padding:"7px 11px",gap:6}}>
@@ -1630,8 +1679,8 @@ function SueldosModule({client,upd,period,config}){
         <div style={{color:C.white,fontWeight:700,fontSize:15,fontFamily:F}}>Liquidación de sueldos — {periodoLargo(period)}</div>
         <div style={{color:"#8ECBDE",fontSize:11,fontFamily:F,marginTop:2}}>Cargá faltas e incidencias del mes; el recibo se calcula solo, igual que la planilla.</div>
       </div>
-      <button onClick={()=>setShowAum(true)} style={{background:"#ffffff1a",color:"#fff",border:"1px solid #ffffff33",borderRadius:8,padding:"9px 14px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>📈 Aumento por convenio</button>
-      <button onClick={()=>imprimirRecibos(client,filas.filter(f=>f.r.gravado>0),period)} style={{background:"#8ECBDE",color:"#021942",border:"none",borderRadius:8,padding:"9px 16px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>🖨 Imprimir todos los recibos</button>
+      <button onClick={()=>setShowAum(true)} style={{background:"#ffffff1a",color:"#fff",border:"1px solid #ffffff33",borderRadius:8,padding:"9px 14px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:6}}><Ico n="grafico" size={14}/>Aumento por convenio</button>
+      <button onClick={()=>imprimirRecibos(client,filas.filter(f=>f.r.gravado>0),period)} style={{background:"#8ECBDE",color:"#021942",border:"none",borderRadius:8,padding:"9px 16px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:6}}><Ico n="impresora" size={14}/>Imprimir todos los recibos</button>
     </div>
     {showAum&&<AumentoModal client={client} onClose={()=>setShowAum(false)} onApply={(emps)=>upd("employees",emps)}/>}
     {(client.employees||[]).some(e=>e.sueldoVigencia&&pKey(period)<pKey(e.sueldoVigencia))&&
@@ -1651,7 +1700,7 @@ function SueldosModule({client,upd,period,config}){
             </div>
           </div>
           <button onClick={()=>setFichaId(editing?null:emp.id)} style={{fontSize:11,padding:"4px 10px",borderRadius:6,border:`1px solid ${C.blue}40`,background:editing?C.blue:C.blue+"10",color:editing?C.white:C.blue,cursor:"pointer",fontFamily:F,fontWeight:600}}>{editing?"Cerrar ficha":"Ficha"}</button>
-          <button onClick={()=>imprimirRecibos(client,[{emp,r}],period)} disabled={r.gravado<=0} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"none",background:r.gravado>0?C.navy:C.border,color:r.gravado>0?"#8ECBDE":C.gray,cursor:r.gravado>0?"pointer":"default",fontFamily:F,fontWeight:700}}>🧾 Recibo PDF</button>
+          <button onClick={()=>imprimirRecibos(client,[{emp,r}],period)} disabled={r.gravado<=0} style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:"none",background:r.gravado>0?C.navy:C.border,color:r.gravado>0?"#8ECBDE":C.gray,cursor:r.gravado>0?"pointer":"default",fontFamily:F,fontWeight:700,display:"flex",alignItems:"center",gap:6}}><Ico n="recibo" size={14}/>Recibo PDF</button>
         </div>
         {editing&&<div style={{background:C.bg,borderRadius:8,padding:12,marginBottom:10,display:"grid",gridTemplateColumns:suM?"1fr 1fr":"repeat(4,1fr)",gap:9}}>
           <div><label style={lbl}>{emp.tipo==="jornalero"?"Valor jornal ($)":"Sueldo básico ($)"}</label>{numIn(emp.tipo==="jornalero"?emp.jornal:emp.sueldo,v=>updEmp(emp.id,emp.tipo==="jornalero"?{jornal:v}:{sueldo:v}),"100%")}</div>
@@ -1821,7 +1870,7 @@ function ReporteModal({clients,initialIds,period,config,onClose}){
     <div onClick={e=>e.stopPropagation()} style={{background:C.white,borderRadius:14,width:760,maxWidth:"100%",maxHeight:"92vh",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 24px 80px #00081f80"}}>
       <div style={{background:ACTIVE_STUDIO==="laser"?"linear-gradient(110deg,#021029,#021942 60%,#0A2B66)":"linear-gradient(110deg,#08152B,#14294F 60%,#24427C)",padding:"13px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div>
-          <div style={{color:"#fff",fontWeight:800,fontSize:15,fontFamily:F}}>📄 Reporte para el cliente — {periodoLargo(period)}</div>
+          <div style={{color:"#fff",fontWeight:800,fontSize:15,fontFamily:F,display:"flex",alignItems:"center",gap:6}}><Ico n="documento" size={16}/>Reporte para el cliente — {periodoLargo(period)}</div>
           <div style={{color:ACTIVE_STUDIO==="laser"?"#8ECBDE":VC_GOLD_LIGHT,fontSize:11,fontFamily:F,marginTop:2}}>Elegí una o varias empresas, ajustá los montos y salí con el PDF de {marcaEstudio().nombre}.</div>
         </div>
         <button onClick={onClose} style={{background:"#ffffff14",border:"1px solid #ffffff25",color:ACTIVE_STUDIO==="laser"?"#8ECBDE":VC_GOLD_LIGHT,borderRadius:8,width:30,height:30,cursor:"pointer",fontSize:15}}>✕</button>
@@ -1880,7 +1929,7 @@ function CalculoMes({client,upd,updTax,period,config}){
         <div style={{color:"#fff",fontWeight:700,fontSize:14,fontFamily:F}}>Cálculo del mes — {periodoLargo(period)}</div>
         <div style={{color:"#8ECBDE",fontSize:11,fontFamily:F,marginTop:2}}>Cargá la facturación y el resto se calcula solo. Vence el {vtoDGI(period,config?.diaDGI)}.</div>
       </div>
-      <button onClick={()=>setVerParams(p=>!p)} style={{background:"#ffffff1a",color:"#fff",border:"1px solid #ffffff33",borderRadius:8,padding:"6px 12px",fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:F}}>{verParams?"Ocultar parámetros":"⚙ Parámetros"}</button>
+      <button onClick={()=>setVerParams(p=>!p)} style={{background:"#ffffff1a",color:"#fff",border:"1px solid #ffffff33",borderRadius:8,padding:"6px 12px",fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:F}}>{verParams?"Ocultar parámetros":"Parámetros"}</button>
     </div>
 
     {verParams&&<div style={{padding:"12px 15px",background:C.bg,borderBottom:`1px solid ${C.border}`,display:"grid",gridTemplateColumns:cmM?"1fr":"repeat(3,1fr)",gap:10}}>
@@ -2335,7 +2384,7 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           </div>
         </div>
         <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
-          <button onClick={()=>setShowReporte(true)} style={{background:ACTIVE_STUDIO==="laser"?"#8ECBDE":VC_GOLD_LIGHT,color:ACTIVE_STUDIO==="laser"?"#021942":VC_NAVY,border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontFamily:F,fontSize:11.5,fontWeight:700,marginRight:3}}>📄 Reporte</button>
+          <button onClick={()=>setShowReporte(true)} style={{background:ACTIVE_STUDIO==="laser"?"#8ECBDE":VC_GOLD_LIGHT,color:ACTIVE_STUDIO==="laser"?"#021942":VC_NAVY,border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontFamily:F,fontSize:11.5,fontWeight:700,marginRight:3,display:"flex",alignItems:"center",gap:6}}><Ico n="documento" size={14}/>Reporte</button>
           <button title="WhatsApp" onClick={()=>{const _wn=(client.whatsapp||"").replace(/\D/g,"");_wn.length>5&&openUrl(`https://wa.me/${_wn}`);}} style={{background:"#25D36618",border:"1px solid #25D36640",borderRadius:7,padding:"3px 6px",cursor:"pointer",display:"flex",alignItems:"center"}}>
             <Logo src={LOGO_WA} size={22} style={{padding:1,borderRadius:3}}/>
           </button>
@@ -2378,6 +2427,8 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
 
       {/* DATOS */}
       {tab==="datos"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
+        <LectorDocs client={client} updVarios={updVarios} period={period} config={config} setConfig={setConfig}/>
+
         <FormSection title="Datos generales">
           <FRow label="Nombre / Razón social" value={client.name}/>
           <div><label style={lbl}>Estado</label><select value={client.status} onChange={e=>upd("status",e.target.value)} style={inp}><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select></div>
@@ -2480,7 +2531,7 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
             </div>;})()}
         </FormSection>}
 
-        <FormSection title="Certificados DGI">
+        <FormSection title="Certificados DGI" abierta={false}>
           {(client.certsDGI||[]).map((cert,ci)=>(
             <div key={cert.id||ci} style={{gridColumn:"1/-1",background:cert.usado?"#F9FAFB":"#F0FDF4",border:`1px solid ${cert.usado?"#E5E7EB":"#86EFAC"}`,borderRadius:7,padding:"10px 12px",marginBottom:4}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -2504,7 +2555,7 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           </div>
         </FormSection>
 
-        <FormSection title="Asociado a Gub.uy del estudio" cols={3}>
+        <FormSection title="Asociado a Gub.uy del estudio" cols={3} abierta={false}>
           {[["BPS",LOGO_BPS,"gubAsocBPS"],["DGI",LOGO_DGI,"gubAsocDGI"],["BSE",LOGO_BSE,"gubAsocBSE"]].map(([lbl2,logo,field])=>(
             <div key={field} onClick={()=>upd(field,!client[field])} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",padding:"8px 10px",borderRadius:6,border:`1px solid ${client[field]?C.ok+"60":C.border}`,background:client[field]?C.ok+"10":C.bg}}>
               <Check checked={client[field]||false} onChange={()=>{}} color={C.ok}/>
@@ -2514,7 +2565,7 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           ))}
         </FormSection>
 
-        <FormSection title="Accesos y Credenciales" cols={1}>
+        <FormSection title="Accesos y Credenciales" cols={1} abierta={false}>
           <CredRow label="DGI" logo={LOGO_DGI} credKey="dgi" creds={client.credentials} onChange={updCred}/>
           <CredRow label="BPS" logo={LOGO_BPS} credKey="bps" creds={client.credentials} onChange={updCred}/>
           <CredRow label="Usuario GUB" logo={null} credKey="usuarioGUB" creds={client.credentials} onChange={updCred}/>
@@ -2530,8 +2581,6 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           <CredRow label="FOCER" logo={null} credKey="focer" creds={client.credentials} onChange={updCred}/>
           <CredRow label="PIN FOCER" logo={null} credKey="pinFOCER" creds={client.credentials} onChange={updCred}/>
         </FormSection>
-
-        <LectorDocs client={client} updVarios={updVarios} period={period} config={config} setConfig={setConfig}/>
 
         {client.hasEmployees&&<EmpBlock client={client} upd={upd} addingEmp={addingEmp} setAddingEmp={setAddingEmp} newEmp={newEmp} setNewEmp={setNewEmp} addEmpF={addEmpF}/>}
       </div>}
@@ -3086,7 +3135,7 @@ function CotizacionesPanel({config,setConfig}){
         {[["USD","Dólar"],["UI","Unidad Indexada"],["UR","Unidad Reajustable"],["EUR","Euro"],["BRL","Real"],["ARS","Peso argentino"]].map(([k,v])=><option key={k} value={k}>{v}</option>)}
       </select></div>
       <div><label style={lbl}>Valor</label><input value={nueva.venta} onChange={e=>setNueva(n=>({...n,venta:e.target.value}))} style={inp} placeholder="40,2030"/></div>
-      <button onClick={agregar} style={{background:C.ok,color:"#fff",border:"none",borderRadius:7,padding:"8px 15px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>Agregar</button>
+      <button onClick={agregar} style={{background:C.ok,color:"#fff",border:"none",borderRadius:7,padding:"8px 18px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:F,justifySelf:"start"}}>Agregar</button>
     </div>
     {cotiz.length===0
       ?<div style={{textAlign:"center",color:C.gray,fontSize:12,fontFamily:F,padding:"14px 0"}}>Todavía no hay cotizaciones cargadas.</div>
@@ -3132,11 +3181,11 @@ function ConfigPanel({config,setConfig}){
         {[["bpc","BPC (pesos)"],["ui","UI (pesos)"],["iraeMinimoMensual","Anticipo IRAE mínimo mensual ($)"],["ivaMinimo","IVA Mínimo Lit. E mensual ($)"],["monotributoA","Monotributo Categoría A ($)"],["monotributoB","Monotributo Categoría B ($)"],["icosaAnual","ICOSA – Anticipo anual S.A. ($)"]].map(([k,l])=><div key={k}><label style={lbl}>{l}</label><input type="number" step="0.01" value={config[k]||0} onChange={e=>set(k,+e.target.value)} style={inp}/></div>)}
         <div style={{gridColumn:"1/-1",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",background:C.bg,borderRadius:8,padding:"9px 12px"}}>
           <div style={{fontSize:11,color:C.gray,fontFamily:F,flex:1,minWidth:220}}>Vigentes 2026: BPC <b>$6.864</b> · SMN <b>$24.572</b> (desde 1/7: $25.383) · IVA Mínimo <b>$5.910</b> · IRAE mínimo <b>$6.840</b>. La UI ajusta a diario — verificala en el BCU.</div>
-          <button onClick={()=>openUrl("https://www.bcu.gub.uy/Estadisticas-e-Indicadores/Paginas/Cotizaciones.aspx")} style={{background:C.blue,color:"#fff",border:"none",borderRadius:7,padding:"7px 13px",fontSize:11.5,fontWeight:700,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>🔗 Cotizaciones BCU</button>
+          <button onClick={()=>openUrl("https://www.bcu.gub.uy/Estadisticas-e-Indicadores/Paginas/Cotizaciones.aspx")} style={{background:C.blue,color:"#fff",border:"none",borderRadius:7,padding:"7px 13px",fontSize:11.5,fontWeight:700,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}><Ico n="enlace" size={14}/>Cotizaciones BCU</button>
           <button onClick={()=>openUrl("https://www.gub.uy/instituto-nacional-estadistica/comunicacion/publicaciones?field_tipo_de_publicacion_target_id=621&field_fecha_de_publicacion_value%5Bvalue%5D%5Byear%5D=")} style={{background:"transparent",color:C.blue,border:`1px solid ${C.blue}50`,borderRadius:7,padding:"7px 13px",fontSize:11.5,fontWeight:700,cursor:"pointer",fontFamily:F,whiteSpace:"nowrap"}}>UI diaria (INE)</button>
         </div>
       </FormSection>
-      <FormSection title="Parámetros fiscales adicionales">
+      <FormSection title="Parámetros fiscales adicionales" abierta={false}>
         {[["icosaMensual","ICOSA mensual S.A. ($)"],["salarioMinimo","Salario mínimo nominal ($)"]].map(([k,l])=><div key={k}><label style={lbl}>{l}</label><input type="number" value={config[k]||0} onChange={e=>set(k,+e.target.value)} style={inp}/></div>)}
         <div><label style={lbl}>Límite Monotributo (UI)</label><input type="number" value={config.limiteMonotributoUI||305000} onChange={e=>set("limiteMonotributoUI",+e.target.value)} style={inp} placeholder="305000"/></div>
         <div><label style={lbl}>Límite Literal E / 3107 / Ficto / IRPF retiros (UI)</label><input type="number" value={config.limiteLiteralEUI||4000000} onChange={e=>set("limiteLiteralEUI",+e.target.value)} style={inp} placeholder="4000000"/></div>
@@ -3245,7 +3294,7 @@ function NotifBell({clients}){
   const askPerm=()=>{if(typeof Notification!=="undefined")Notification.requestPermission().then(p=>setPerm(p));};
   return<div style={{position:"relative",flexShrink:0}}>
     <button onClick={()=>setOpen(p=>!p)} title="Avisos y vencimientos" style={{position:"relative",background:open?C.navy:"transparent",border:`1px solid ${open?C.navy:C.border}`,borderRadius:8,padding:"4px 9px",cursor:"pointer",fontSize:15,lineHeight:1.2,color:open?"#fff":C.navy}}>
-      🔔{items.length>0&&<span style={{position:"absolute",top:-6,right:-6,minWidth:16,height:16,borderRadius:99,background:red>0?C.red:C.warn,color:"#fff",fontSize:9.5,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px",fontFamily:F,border:"2px solid #fff",boxSizing:"content-box"}}>{items.length>99?"99+":items.length}</span>}
+      <Ico n="alertas" size={16}/>{items.length>0&&<span style={{position:"absolute",top:-6,right:-6,minWidth:16,height:16,borderRadius:99,background:red>0?C.red:C.warn,color:"#fff",fontSize:9.5,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px",fontFamily:F,border:"2px solid #fff",boxSizing:"content-box"}}>{items.length>99?"99+":items.length}</span>}
     </button>
     {open&&<>
       <div onClick={()=>setOpen(false)} style={{position:"fixed",inset:0,zIndex:140}}/>
@@ -3255,7 +3304,7 @@ function NotifBell({clients}){
           <div style={{fontSize:10.5,color:"#8ECBDE",fontFamily:F,fontWeight:600}}>{items.length===0?"Al día ✓":`${items.length} aviso${items.length!==1?"s":""}`}</div>
         </div>
         <div style={{maxHeight:330,overflowY:"auto"}}>
-          {items.length===0&&<div style={{padding:"26px 14px",textAlign:"center",color:C.gray,fontSize:12.5,fontFamily:F}}>🎉 Sin vencimientos próximos.<br/>Todo en orden.</div>}
+          {items.length===0&&<div style={{padding:"26px 14px",textAlign:"center",color:C.gray,fontSize:12.5,fontFamily:F,display:"flex",flexDirection:"column",alignItems:"center",gap:7}}><span style={{color:C.ok,display:"flex"}}><Ico n="listo" size={26}/></span>Sin vencimientos próximos.<br/>Todo en orden.</div>}
           {items.map((it,i)=><div key={i} style={{padding:"9px 14px",borderBottom:`1px solid ${C.border}60`,display:"flex",gap:9,alignItems:"flex-start"}}>
             <div style={{width:8,height:8,borderRadius:99,marginTop:4,flexShrink:0,background:it.sev==="red"?C.red:C.warn}}/>
             <div style={{minWidth:0}}>
@@ -3269,7 +3318,7 @@ function NotifBell({clients}){
             ?<div style={{fontSize:10.5,color:C.ok,fontFamily:F,fontWeight:600}}>✓ Avisos de escritorio activados — te llega una notificación de Windows por día con los vencimientos.</div>
             :perm==="denied"
               ?<div style={{fontSize:10.5,color:C.gray,fontFamily:F}}>Las notificaciones están bloqueadas en el navegador. Activalas desde el candado de la barra de direcciones.</div>
-              :<button onClick={askPerm} style={{width:"100%",background:C.blue,color:"#fff",border:"none",borderRadius:7,padding:"7px",fontSize:11.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>🖥 Activar avisos de escritorio (Windows)</button>}
+              :<button onClick={askPerm} style={{width:"100%",background:C.blue,color:"#fff",border:"none",borderRadius:7,padding:"7px",fontSize:11.5,fontWeight:700,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:6}}><Ico n="pantalla" size={14}/>Activar avisos de escritorio (Windows)</button>}
         </div>}
       </div>
     </>}
@@ -3378,7 +3427,7 @@ export default function Obligo(){
     <Sidebar view={view} setView={(v)=>{setView(v);if(v!=="client")setClientId(null);setSidebarOpen(false);}} user={authUser} onLogout={handleLogout}/>
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
       <div style={{background:C.white,borderBottom:`1px solid ${C.border}`,padding:"8px 14px",display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-        {isMobile&&<button onClick={()=>setSidebarOpen(p=>!p)} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,padding:"5px 9px",cursor:"pointer",fontSize:17,lineHeight:1,color:C.navy,flexShrink:0}}>☰</button>}
+        {isMobile&&<button onClick={()=>setSidebarOpen(p=>!p)} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,padding:"5px 9px",cursor:"pointer",fontSize:17,lineHeight:1,color:C.navy,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}><Ico n="menu" size={17}/></button>}
         <div style={{flex:1,fontSize:12,color:C.gray,fontFamily:F,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
           {view==="client"&&client?<span><span style={{color:C.blue,cursor:"pointer"}} onClick={()=>setView("clients")}>Clientes</span> / {client.name}</span>
             :<span style={{color:C.navy,fontWeight:600}}>{view==="dashboard"?"Panel Principal":view==="clients"?"Clientes":view==="config"?"Configuración":view==="calendario"?"Calendario":view.charAt(0).toUpperCase()+view.slice(1)}</span>}
