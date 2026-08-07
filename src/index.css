@@ -1,22 +1,48 @@
+/* Base de Obligo. Los colores vivos los escribe aplicarTema() sobre <html>
+   como variables --app-*; acá sólo se consumen, para que el fondo, el
+   scrollbar, el foco y el autocompletado del navegador acompañen al tema. */
+
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
+:root {
+  --app-bg: #f7f8fa;
+  --app-ink: #14294f;
+  --app-card: #ffffff;
+  --app-border: #cbcfd8;
+  --app-focus: #2948d9;
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
-  margin: 0;
-  padding: 0;
+}
+
+html {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
-  font-family: 'Poppins', 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #EEF0F6;
-  color: #021942;
+  font-family: "Poppins", "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--app-bg);
+  color: var(--app-ink);
+  font-size: 14px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 #root {
@@ -24,48 +50,79 @@ body {
   flex-direction: column;
 }
 
-/* Scrollbar personalizado */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Las cifras se leen en columna: ancho fijo por dígito y cero con barra. */
+input[inputmode="decimal"],
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
 }
 
-::-webkit-scrollbar-track {
-  background: #EFF0F4;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #8ECBDE;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #2948D9;
-}
-
-/* Selección de texto */
-::selection {
-  background: #2948D9;
-  color: white;
-}
-
-/* Links */
-a {
-  color: #2948D9;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-/* Focus visible para accesibilidad */
-*:focus-visible {
-  outline: 2px solid #2948D9;
+/* Foco visible y con la forma del control, no el anillo del navegador. */
+:focus-visible {
+  outline: 2px solid var(--app-focus);
   outline-offset: 2px;
+  border-radius: 6px;
+}
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
 }
 
-button:focus-visible {
-  outline: 2px solid #2948D9;
-  outline-offset: -2px;
+::selection {
+  background: color-mix(in srgb, var(--app-focus) 22%, transparent);
+  color: var(--app-ink);
+}
+
+/* Chrome pinta el autocompletado de amarillo y en oscuro queda ilegible. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--app-ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--app-card) inset;
+  caret-color: var(--app-ink);
+  transition: background-color 9999s ease-out;
+}
+
+/* El date picker nativo es negro sobre fondo oscuro si no se lo invierte. */
+html[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.65);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--app-border) 85%, transparent);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--app-border);
+  background-clip: content-box;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-border) transparent;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
