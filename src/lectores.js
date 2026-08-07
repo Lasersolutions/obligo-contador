@@ -104,8 +104,23 @@ export function lineasDeItems(items) {
 }
 
 export async function textoPDF(arrayBuffer) {
-  const pdfjs = await cargarPdfjs();
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer), useSystemFonts: true }).promise;
+  let pdfjs;
+  try {
+    pdfjs = await cargarPdfjs();
+  } catch (e) {
+    throw new Error("No pude cargar el lector de PDF. Suele ser una versión vieja de la app guardada en el navegador: recargá la página con Ctrl+Shift+R y probá de nuevo.");
+  }
+  let doc;
+  try {
+    doc = await pdfjs.getDocument({ data: new Uint8Array(arrayBuffer), useSystemFonts: true }).promise;
+  } catch (e) {
+    // El "fake worker" es el plan B de pdf.js cuando no consigue el worker;
+    // si también falla, lo que no llegó es el archivo del lector, no el PDF.
+    if (/worker/i.test(String(e && e.message))) {
+      throw new Error("No pude cargar el lector de PDF. Suele ser una versión vieja de la app guardada en el navegador: recargá la página con Ctrl+Shift+R y probá de nuevo.");
+    }
+    throw new Error("No pude abrir el PDF. ¿Está completo y no es una imagen escaneada sin texto?");
+  }
   const partes = [];
   for (let i = 1; i <= doc.numPages; i++) {
     const pagina = await doc.getPage(i);

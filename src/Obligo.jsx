@@ -301,6 +301,8 @@ function calc2908(client,cfg={},period=""){
       :usaMin?`Mínimo del año ($ ${fU(a.iraeMin,0)})`
       :`Coeficiente ${t.iraeCoeficiente} sobre la facturación`);
   }
+  if(t.renta==="irpf_cat2")add("irpf","Anticipo IRPF Categoría II",a.irpf,
+    a.irpf2&&a.ventas?`70% de $ ${fU(a.ventas,0)} = $ ${fU(a.irpf2.base,0)} por la escala`:"Falta cargar la facturación del mes");
   if(t.patrimonio&&t.renta!=="ninguno")add("ip","Anticipo Impuesto al Patrimonio",a.ip,t.ipMontoAnual?`Anual: $ ${fU(+t.ipMontoAnual,0)}`:"");
   if(client.entityType==="sa")add("icosa","ICOSA mensual",client.icosaMonto||0);
   if(t.iva==="minimo")add("ivaMin","IVA Mínimo — Literal E",cfg.ivaMinimo||0,"Valor fijo del año");
@@ -1476,9 +1478,63 @@ function calcAnticipos(client,period,config,depth=12){
   }
   const ip=t.patrimonio?(t.ipAnticipoMensual!=null&&t.ipAnticipoMensual!==""?+t.ipAnticipoMensual:Math.round((+t.ipMontoAnual||0)/12)):0;
   const ivaMinimo=t.iva==="minimo"?(config?.ivaMinimo||0):0;
-  const total=pagoIVA+irae+ip+ivaMinimo;
-  return{tasa,ventas,ivaVentas,ivaCompras,retTarj,excedentePrev,ivaAPagar,pagoIVA,excedente,vtaFijo,coef,iraeCoef,iraeMin,irae,ip,ivaMinimo,total,
+  // IRPF Cat. II: el 70% de lo facturado sin impuestos pasa por la escala
+  let irpf2=null,irpf=0;
+  if(t.renta==="irpf_cat2"){
+    irpf2=calcIRPF2(ventas,config?.bpc,+b.deducIRPF||0);
+    irpf=t.irpfMontoMensual!=null&&t.irpfMontoMensual!==""?+t.irpfMontoMensual:Math.round(irpf2.aPagar);
+  }
+  const total=pagoIVA+irae+ip+ivaMinimo+irpf;
+  return{tasa,ventas,ivaVentas,ivaCompras,retTarj,excedentePrev,ivaAPagar,pagoIVA,excedente,vtaFijo,coef,iraeCoef,iraeMin,irae,ip,ivaMinimo,irpf,irpf2,total,
     cargado:!!(b.ventas||b.ivaCompras||b.retTarj||b.ivaVentas)};
+}
+
+// ─── IRPF CATEGORÍA II ────────────────────────────────────────────
+// Servicios personales fuera de relación de dependencia. La base imponible es
+// el 70% de los ingresos brutos sin impuestos: el 30% restante es la deducción
+// ficta de gastos que admite la ley, no hace falta justificarla.
+//
+// La escala se guarda en BPC y no en pesos a propósito: cuando en enero cambia
+// el valor de la BPC (Configuración), los tramos se recalculan solos.
+const IRPF2_FICTO_GASTOS = 0.30;
+const IRPF2_ESCALA = [
+  { desde: 0,   hasta: 7,    tasa: 0 },
+  { desde: 7,   hasta: 10,   tasa: 0.10 },
+  { desde: 10,  hasta: 15,   tasa: 0.15 },
+  { desde: 15,  hasta: 30,   tasa: 0.24 },
+  { desde: 30,  hasta: 50,   tasa: 0.25 },
+  { desde: 50,  hasta: 75,   tasa: 0.27 },
+  { desde: 75,  hasta: 115,  tasa: 0.31 },
+  { desde: 115, hasta: null, tasa: 0.36 },
+];
+// La escala de deducciones tiene sus propias franjas: el crédito es del 14%
+// hasta 15 BPC de renta y del 8% por encima.
+const IRPF2_DEDUC = [
+  { hasta: 15,   tasa: 0.14 },
+  { hasta: null, tasa: 0.08 },
+];
+
+// Devuelve el desglose tramo por tramo, que es lo que se muestra en pantalla:
+// un total sin explicación no sirve para controlar contra la planilla de DGI.
+function calcIRPF2(brutoSinImpuestos, bpc, deducciones = 0) {
+  const b = +bpc || 6864;
+  const bruto = +brutoSinImpuestos || 0;
+  const base = bruto * (1 - IRPF2_FICTO_GASTOS);
+  const tramos = [];
+  let impuesto = 0;
+  for (const f of IRPF2_ESCALA) {
+    const desde = f.desde * b;
+    const hasta = f.hasta == null ? Infinity : f.hasta * b;
+    const enTramo = Math.max(0, Math.min(base, hasta) - desde);
+    if (enTramo <= 0) continue;
+    const monto = enTramo * f.tasa;
+    impuesto += monto;
+    tramos.push({ desde, hasta: f.hasta == null ? null : hasta, tasa: f.tasa, gravado: enTramo, monto });
+  }
+  const franjaDed = IRPF2_DEDUC.find((d) => d.hasta == null || base <= d.hasta * b) || IRPF2_DEDUC[IRPF2_DEDUC.length - 1];
+  const credito = (+deducciones || 0) * franjaDed.tasa;
+  const aPagar = Math.max(0, impuesto - credito);
+  return { bruto, base, ficto: bruto - base, tramos, impuesto, tasaDeduc: franjaDed.tasa, credito, aPagar, bpc: b };
 }
 
 // ─── CONSEJOS DE SALARIOS (actas MTSS) ────────────────────────────
@@ -1877,7 +1933,7 @@ function buildLineasEmpresa(c,period,config){
   if(t.iva==="sp")lines.push({org:"DGI",label:"IVA Servicios Personales — Form. 1302",due:dgiDue,amount:null});
   if(t.iva==="monotributo")lines.push({org:"BPS",label:"Cuota Monotributo unificada",due:bpsDue,amount:null});
   if(t.renta==="irae")lines.push({org:"DGI",label:`Anticipo IRAE${t.iraeEsFicto?" (régimen ficto)":""}`,due:dgiDue,amount:mt("irae")});
-  if(t.renta==="irpf_cat2")lines.push({org:"DGI",label:"Anticipo IRPF Cat. II / FONASA serv. personales",due:dgiDue,amount:null});
+  if(t.renta==="irpf_cat2")lines.push({org:"DGI",label:"Anticipo IRPF Cat. II — servicios personales",due:dgiDue,amount:mt("irpf")});
   if(t.patrimonio)lines.push({org:"DGI",label:"Anticipo Impuesto al Patrimonio",due:dgiDue,amount:mt("ip")});
   if(c.entityType==="sa")lines.push({org:"DGI",label:"ICOSA mensual",due:dgiDue,amount:mt("icosa")});
   if(c.hasEmployees&&(c.employees||[]).length){
@@ -2109,6 +2165,24 @@ function CalculoMes({client,upd,updTax,period,config}){
               <Fila label="Mínimo del mes" valor={r.iraeMin}/>
               <Fila label={r.iraeCoef>=r.iraeMin?"Se paga el coeficiente":"Se paga el mínimo"} valor={r.irae} fuerte/>
             </>}
+        </div>}
+
+        {t.renta==="irpf_cat2"&&r.irpf2&&<div style={{marginBottom:12}}>
+          <div style={{fontSize:10,fontWeight:800,letterSpacing:1,color:C.gray,fontFamily:F,marginBottom:4}}>IRPF CATEGORÍA II — SERVICIOS PERSONALES</div>
+          <Fila label="Facturado sin impuestos" valor={r.irpf2.bruto}/>
+          <Fila label="Deducción ficta de gastos" detalle="30% que la ley reconoce sin justificar" valor={r.irpf2.ficto} negativo color={C.gray}/>
+          <Fila label="Renta computable" detalle="es lo que pasa por la escala" valor={r.irpf2.base} fuerte/>
+          {r.irpf2.tramos.length===0
+            ?<div style={{fontSize:11.5,color:C.okTxt,fontFamily:F,padding:"6px 0"}}>La renta del mes no llega al mínimo no imponible de 7 BPC ({money(7*(config?.bpc||6864))}): no paga IRPF.</div>
+            :r.irpf2.tramos.map((tr,i)=>(
+              <Fila key={i} label={`Tramo ${tr.hasta==null?"desde "+money(tr.desde):money(tr.desde)+" a "+money(tr.hasta)}`}
+                detalle={`${money(tr.gravado)} al ${(tr.tasa*100).toFixed(0)}%`} valor={tr.monto}/>))}
+          <div style={{display:"grid",gridTemplateColumns:cmM?"1fr":"1fr 150px",gap:8,alignItems:"center",padding:"7px 0"}}>
+            <label style={{...lbl,marginBottom:0}}>Deducciones del mes (aportes, fondo de solidaridad, hijos…)</label>
+            {inNum(b.deducIRPF,v=>setB({deducIRPF:v}))}
+          </div>
+          {r.irpf2.credito>0&&<Fila label="Crédito por deducciones" detalle={`${(r.irpf2.tasaDeduc*100).toFixed(0)}% de ${money(+b.deducIRPF||0)}`} valor={r.irpf2.credito} negativo color={C.gray}/>}
+          <Fila label="IRPF del mes" valor={r.irpf} fuerte color={C.navy}/>
         </div>}
 
         {t.patrimonio&&<div style={{marginBottom:12}}>
