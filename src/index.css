@@ -2,7 +2,7 @@
    como variables --app-*; acá sólo se consumen, para que el fondo, el
    scrollbar, el foco y el autocompletado del navegador acompañen al tema. */
 
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 
 :root {
@@ -34,7 +34,7 @@ html[data-theme="dark"] {
 }
 
 body {
-  font-family: "Poppins", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   background: var(--app-bg);
   color: var(--app-ink);
   font-size: 14px;

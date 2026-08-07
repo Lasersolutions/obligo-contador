@@ -25,7 +25,7 @@ function useWW(){
 //   blue  = relleno del botón (lleva texto blanco encima).
 //   blueTxt = el mismo azul pero para texto, link y foco. En claro valen igual;
 //             sólo divergen en oscuro, donde el relleno no se lee como texto.
-const F="Poppins,'Segoe UI',system-ui,-apple-system,sans-serif";
+const F="'IBM Plex Sans','Segoe UI',system-ui,-apple-system,sans-serif";
 const FN="'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace";
 
 const NEUTROS_CLARO={
