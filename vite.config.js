@@ -42,6 +42,14 @@ export default defineConfig({
       workbox: {
         // Cachea todos los assets del build
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // TODA navegación se responde con el mismo index.html precacheado.
+        // Sin esto, "/" salía del caché del service worker y "/app" iba siempre
+        // a la red: quedaban dos versiones distintas de la app conviviendo,
+        // según por dónde se entrara.
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/assets\//, /\.[a-z0-9]+$/i],
+        // Al publicar una versión nueva se borran los precachés anteriores
+        cleanupOutdatedCaches: true,
         // Cuando hay una nueva versión desplegada en Vercel,
         // el SW se activa automáticamente en el próximo reload
         skipWaiting: true,
