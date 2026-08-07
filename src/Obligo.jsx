@@ -161,6 +161,8 @@ function nextP(p){const d=pd(p);d.setMonth(d.getMonth()+1);return dp(d);}
 function vtoDGI(p,dia){return`${String(dia||22).padStart(2,"0")}/${nextP(p)}`;}
 function vtoBPS(p,dia){return`${String(dia||10).padStart(2,"0")}/${nextP(p)}`;}
 function vtoISO(v){const[d,mm,y]=(v||"").split("/");return y?`${y}-${mm}-${d}`:"";}
+const fechaAIso=vtoISO;                                   // DD/MM/AAAA → AAAA-MM-DD
+const isoAFecha=(v)=>v?v.split("-").reverse().join("/"):""; // y la vuelta
 function daysUntil(s){if(!s)return null;return Math.round((new Date(s)-new Date(TODAY))/(86400000));}
 function dateAdd(dateStr,days){const d=new Date(dateStr);d.setDate(d.getDate()+days);return d.toISOString().split('T')[0];}
 
@@ -321,17 +323,45 @@ function aportesBPS(client,period,config){
   return Math.round((client.employees||[]).reduce((a,e)=>a+calcRecibo(e,inc[e.id]||{},opts).aportes,0));
 }
 
-// Lo que hay que pagar este mes en cada organismo: es la línea que se ve en el Panel.
-function resumenMes(client,period,config){
+// Los servicios personales NO profesionales pagan dos facturas al BPS: la de
+// FONASA y la de Industria y Comercio. (Los profesionales aportan a su caja,
+// no al BPS.) El resto paga una sola. Se puede forzar con client.bpsDoble.
+function bpsDoble(c){
+  if(c.bpsDoble!=null)return !!c.bpsDoble;
+  return (c.taxes||{}).iva==="sp"||c.nature==="servicios_personales";
+}
+
+// Los boletos que este cliente realmente paga cada mes. De acá salen tanto la
+// línea del Panel como la pantalla de Pagos / Trámites, para que no se puedan
+// contradecir.
+function boletosDe(client,period,config){
   const obs=getObs(client,period).filter(o=>o.freq==="mensual");
   const out=[];
   if(obs.some(o=>(o.org||"").includes("DGI")))
-    out.push({org:"dgi",label:"DGI",logo:LOGO_DGI,color:C.red,vto:vtoDGI(period,config?.diaDGI),
-      monto:calc2908(client,config,period).total,n:obs.filter(o=>(o.org||"").includes("DGI")).length});
-  if(obs.some(o=>(o.org||"").includes("BPS")))
-    out.push({org:"bps",label:"BPS",logo:LOGO_BPS,color:C.blueTxt,vto:vtoBPS(period,config?.diaBPS),
-      monto:aportesBPS(client,period,config),n:obs.filter(o=>(o.org||"").includes("BPS")).length});
+    out.push({id:"dgi",org:"DGI",label:"DGI — Boleto 2908",corto:"DGI",logo:LOGO_DGI,color:C.red,
+      vto:vtoDGI(period,config?.diaDGI),auto:calc2908(client,config,period).total});
+  if(obs.some(o=>(o.org||"").includes("BPS"))){
+    const vb=vtoBPS(period,config?.diaBPS);
+    if(bpsDoble(client)){
+      out.push({id:"bps_fonasa",org:"BPS",label:"BPS — FONASA",corto:"FONASA",logo:LOGO_BPS,color:C.blueTxt,vto:vb,auto:0});
+      out.push({id:"bps_ic",org:"BPS",label:"BPS — Industria y Comercio",corto:"BPS Ind. y Com.",logo:LOGO_BPS,color:C.blueTxt,
+        vto:vb,auto:aportesBPS(client,period,config)});
+    }else{
+      out.push({id:"bps",org:"BPS",label:"BPS",corto:"BPS",logo:LOGO_BPS,color:C.blueTxt,vto:vb,
+        auto:aportesBPS(client,period,config)});
+    }
+  }
   return out;
+}
+
+// Lo que hay que pagar este mes en cada organismo: es la línea que se ve en el Panel.
+function resumenMes(client,period,config){
+  return boletosDe(client,period,config).map(b=>{
+    const g=client.boletos?.[period]?.[b.id]||{};
+    return{...b,org:b.id,label:b.corto,
+      vto:g.vto?isoAFecha(g.vto):b.vto,
+      monto:g.monto!=null&&g.monto!==""?+g.monto:b.auto};
+  });
 }
 
 // ─── INITIAL DATA ─────────────────────────────────────────────────
@@ -358,7 +388,7 @@ const mk=(id,name,entityType,nature,taxes,opts={})=>{
   delete o.certDGI;delete o.certDGINum;delete o.certDGIImporte;delete o.certDGIEmision;delete o.certsDGI;
   return{id,name,entityType,nature,taxes,status:"activo",
     rut:"",cedula:"",numEmpresa:"",phone:"",whatsapp:"+598",email:"",
-    giro:"",startDate:"",hasEmployees:false,employees:[],
+    giro:"",giroDGI:"",giroBPS:"",startDate:"",hasEmployees:false,employees:[],bpsDoble:null,
     efactura:"activo",specialTaxes:[],
     studyFee:null,studyFeePaid:false,studyFeeDate:null,studyFeeNotes:"",
     billing:{},nominas:{},facturas:{},
@@ -461,6 +491,7 @@ const normClient=(c)=>({
   nominas:c.nominas||{},sueldos:c.sueldos||{},billing:c.billing||{},facturas:c.facturas||{},boletos:c.boletos||{},
   anticipos:c.anticipos||{},obPagos:c.obPagos||{},
   aportaciones:Array.isArray(c.aportaciones)?c.aportaciones:[],docsLeidos:Array.isArray(c.docsLeidos)?c.docsLeidos:[],
+  giroDGI:c.giroDGI||"",giroBPS:c.giroBPS||"",
   credentials:c.credentials||mkCred(),
 });
 const CLIENTS_LASER=marcarAlDia([
@@ -2205,7 +2236,7 @@ function CalculoMes({client,upd,updTax,period,config}){
 
 // ─── CLIENT DETAIL ────────────────────────────────────────────────
 // ─── LECTURA DE DOCUMENTOS ────────────────────────────────────────
-const ETIQ_CAMPO={name:"Razón social",rut:"RUT",numEmpresa:"Nº empresa (BPS)",cedula:"Cédula titular",giro:"Giro",
+const ETIQ_CAMPO={name:"Razón social",rut:"RUT",numEmpresa:"Nº empresa (BPS)",cedula:"Cédula titular",giro:"Giro",giroDGI:"Giro ante DGI",giroBPS:"Giro ante BPS",
   startDate:"Inicio de actividades",inscripcionDGI:"Inscripción en DGI",cierreBalance:"Cierre de balance",
   efactura:"e-Factura",phone:"Teléfono",whatsapp:"WhatsApp",email:"Email",domicilio:"Domicilio",
   grupoMTSS:"Grupo MTSS",entityType:"Tipo de entidad",hasEmployees:"Tiene empleados",codigoConsejo:"Código del consejo de salarios"};
@@ -2260,9 +2291,17 @@ function LectorDocs({client,updVarios,period,config,setConfig}){
     const nuevos=cert.empleados.filter((e,i)=>selEmp[i]);
     if(nuevos.length){
       const ya=(client.employees||[]).map(e=>String(e.ci||"").replace(/\D/g,""));
-      const suma=nuevos.filter(e=>!ya.includes(e.ci)).map(e=>({id:Date.now()+Math.random(),name:e.name,ci:e.ci,cargo:e.cargo,
-        tipo:e.tipo,sueldo:e.sueldo,jornal:null,menores:0,snisAd:0,ingreso:e.ingreso,notes:""}));
-      if(suma.length){patch.employees=[...(client.employees||[]),...suma];n+=suma.length;}
+      const suma=nuevos.filter(e=>!ya.includes(String(e.ci||"").replace(/\D/g,""))).map(e=>mkEmpL({
+        id:Date.now()+Math.random(),name:e.name,nombres:e.nombres||"",apellidos:e.apellidos||"",
+        ci:e.ci,cargo:e.cargo,tipo:e.tipo,sueldo:e.sueldo,ingreso:e.ingreso,
+        notes:e.egreso?`Egreso ${e.egreso.split("-").reverse().join("/")}`:"",
+      }));
+      if(suma.length){
+        patch.employees=[...(client.employees||[]),...suma];
+        // Sin esto la pestaña Sueldos ni siquiera aparece
+        patch.hasEmployees=true;
+        n+=suma.length;
+      }
     }
     patch.docsLeidos=[...(client.docsLeidos||[]).filter(d=>d.tipo!==cert.tipo),{tipo:cert.tipo,nombre:cert.tipoNombre,archivo:cert.archivo,fecha:TODAY}];
     if(Object.keys(taxes).length)patch.taxes=taxes;
@@ -2501,13 +2540,28 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
   const updBoleto=(org,f,v)=>setBoleto(org,{[f]:v});
   // Generar el boleto deja el importe cargado en Pagos / Trámites, listo para pagar y avisar
   const generarBoleto=(org)=>{
+    const b=boletosDe(client,period,config).find(x=>x.id===org);
+    const emps=(client.employees||[]).length;
     const detalle=org==="dgi"
       ?items2908.map(i=>`${i.label}: $ ${fU(i.monto,0)}`).join(" · ")
-      :`Aportes BPS de ${(client.employees||[]).length} empleado${(client.employees||[]).length!==1?"s":""} según la liquidación del mes`;
-    setBoleto(org,{monto:org==="dgi"?total2908:aportesBPS(client,period,config),detalle,generado:TODAY});
+      :org==="bps_fonasa"
+        ?"FONASA del titular. El importe sale de la factura del BPS."
+        :emps?`Aportes BPS de ${emps} empleado${emps!==1?"s":""} según la liquidación del mes`
+             :"Aportes del titular ante BPS.";
+    setBoleto(org,{monto:b?b.auto:0,detalle,generado:TODAY});
     setTab("operativo");
   };
-  const boletoWAMsg=()=>{const bps=getBoleto("bps"),dgi=getBoleto("dgi");const lines=[];if(bps.monto)lines.push(`BPS (vto. día ${config.diaBPS||10}): $${Number(bps.monto).toLocaleString("es-UY")}${bps.ref?` - Ref: ${bps.ref}`:""}`);if(dgi.monto)lines.push(`DGI 2908 (vto. día ${config.diaDGI||22}): $${Number(dgi.monto).toLocaleString("es-UY")}${dgi.ref?` - Ref: ${dgi.ref}`:""}`);const tot=(+bps.monto||0)+(+dgi.monto||0);if(tot>0)lines.push(`*Total: $${tot.toLocaleString("es-UY")}*`);return`Hola *${client.name}*, importes del período *${period}*:\n\n${lines.join("\n")}\n\nSaludos, ${config.studioName||"Estudio"}`};
+  const boletoWAMsg=()=>{
+    const lineas=[];let tot=0;
+    boletosDe(client,period,config).forEach(b=>{
+      const g=getBoleto(b.id);const m=+g.monto||0;if(!m)return;
+      tot+=m;
+      lineas.push(`${b.label} (vence ${g.vto?isoAFecha(g.vto):b.vto}): $${m.toLocaleString("es-UY")}${g.ref?` - Ref: ${g.ref}`:""}`);
+    });
+    if(tot>0)lineas.push(`*Total: $${tot.toLocaleString("es-UY")}*`);
+    return["Hola *"+client.name+"*, importes del período *"+period+"*:","",
+      lineas.join("\n"),"","Saludos, "+(config.studioName||"Estudio")].join("\n");
+  };
   const applyCertBoleto=()=>{if(certBoletoIdx<0||!certBoletoMonto||!certBoletoOrg)return;const monto=Math.min(+certBoletoMonto,(client.certsDGI||[])[certBoletoIdx]?.saldoRestante||0);const certs=[...(client.certsDGI||[])];const cc=certs[certBoletoIdx];const ns=(cc.saldoRestante||0)-monto;certs[certBoletoIdx]={...cc,saldoRestante:Math.max(0,ns),usado:ns<=0};upd("certsDGI",certs);updBoleto(certBoletoOrg,"pagadoCert",true);updBoleto(certBoletoOrg,"certMonto",(getBoleto(certBoletoOrg).certMonto||0)+monto);setCertBoletoMonto("");setCertBoletoIdx(-1);setCertBoletoOrg("");};
 
   // ── Incidencias helpers ──
@@ -2624,6 +2678,11 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           <FRow label="Nº Empresa (BPS)" value={client.numEmpresa} editable onChange={v=>upd("numEmpresa",v)} placeholder="0000000"/>
           <FRow label="Cédula titular" value={client.cedula} editable onChange={v=>upd("cedula",v)}/>
           <FRow label="Giro" value={client.giro} editable onChange={v=>upd("giro",v)}/>
+          <div/>
+          {/* DGI y BPS tienen nomencladores distintos: el mismo cliente suele
+              figurar con un giro en cada uno, así que van por separado. */}
+          <FRow label="Giro ante DGI" value={client.giroDGI} editable onChange={v=>upd("giroDGI",v)} placeholder="Sale de la Consulta de Datos Registrales"/>
+          <FRow label="Giro ante BPS" value={client.giroBPS} editable onChange={v=>upd("giroBPS",v)} placeholder="Sale de la Planilla de Trabajo o de la constancia del BPS"/>
           <FRow label="Inicio actividades" value={client.startDate} editable onChange={v=>upd("startDate",v)} placeholder="01/01/2024"/>
           <FRow label="Cierre de balance" value={client.cierreBalance} editable onChange={v=>upd("cierreBalance",v)} placeholder="30/06"/>
           <FRow label="Grupo MTSS" value={client.grupoMTSS} editable onChange={v=>upd("grupoMTSS",v)}/>
@@ -2643,6 +2702,18 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           <div><label style={lbl}>Patrimonio (IP)</label><select value={client.taxes?.patrimonio?"aplica":"no_aplica"} onChange={e=>updTax("patrimonio",e.target.value==="aplica")} style={inp}><option value="no_aplica">No aplica</option><option value="aplica">Aplica (1,5%)</option></select></div>
           <div><label style={lbl}>e-Factura</label><select value={client.efactura} onChange={e=>upd("efactura",e.target.value)} style={inp}>{[["activo","Activo"],["pendiente","Pendiente"],["no_aplica","No aplica"],["exceptuado","Exceptuado"]].map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
           <div style={{display:"flex",alignItems:"center",gap:8}}><Check checked={client.hasEmployees} onChange={()=>upd("hasEmployees",!client.hasEmployees)}/><span style={{fontSize:13,color:C.navy,fontFamily:F}}>Tiene empleados</span></div>
+          {/* Los servicios personales no profesionales reciben dos facturas del
+              BPS: la de FONASA y la de Industria y Comercio. */}
+          <div style={{gridColumn:"1/-1",display:"flex",alignItems:"flex-start",gap:8,padding:"9px 11px",background:C.sunken,borderRadius:8}}>
+            <Check checked={bpsDoble(client)} onChange={()=>upd("bpsDoble",!bpsDoble(client))} color={C.blue}/>
+            <div>
+              <div style={{fontSize:13,color:C.navy,fontFamily:F}}>Paga dos facturas al BPS (FONASA e Industria y Comercio)</div>
+              <div style={{fontSize:11,color:C.gray,fontFamily:F,marginTop:2}}>
+                Es el caso de los servicios personales no profesionales.
+                {client.bpsDoble==null&&<> Ahora se deduce del régimen; al tocarlo queda fijo.</>}
+              </div>
+            </div>
+          </div>
         </FormSection>
 
         {(client.taxes?.renta==="irae"||client.taxes?.patrimonio||client.entityType==="sa")&&<FormSection title="Anticipos de impuestos (Boleto 2908)">
@@ -2916,14 +2987,15 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
             <div style={{fontWeight:600,color:C.navy,fontSize:13,fontFamily:F,display:"flex",alignItems:"center",gap:7}}>
               <div style={{width:4,height:14,background:C.blue,borderRadius:2}}/>Boletos a pagar — período {period}
             </div>
-            <button onClick={()=>{const wn=(client.whatsapp||"").replace(/\D/g,"");if(wn.length>5&&(getBoleto("bps").monto||getBoleto("dgi").monto))openUrl(`https://wa.me/${wn}?text=${encodeURIComponent(boletoWAMsg())}`);else alert("Ingresá los montos y verificá el WhatsApp del cliente.");}} style={{background:"#25D36618",color:"#25D366",border:"1px solid #25D36640",borderRadius:5,padding:"4px 10px",fontSize:11,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:5}}>
+            <button onClick={()=>{const wn=(client.whatsapp||"").replace(/\D/g,"");if(wn.length>5&&boletosDe(client,period,config).some(b=>+getBoleto(b.id).monto>0))openUrl(`https://wa.me/${wn}?text=${encodeURIComponent(boletoWAMsg())}`);else alert("Ingresá los montos y verificá el WhatsApp del cliente.");}} style={{background:"#25D36618",color:"#25D366",border:"1px solid #25D36640",borderRadius:5,padding:"4px 10px",fontSize:11,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:5}}>
               <Logo src={LOGO_WA} size={14} style={{borderRadius:2}}/>Enviar importes
             </button>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {[["bps","BPS",C.blue,LOGO_BPS,vtoBPS(period,config.diaBPS)],["dgi","DGI — Boleto 2908",C.red,LOGO_DGI,vtoDGI(period,config.diaDGI)]].map(([org,label,col,logo,vto])=>{
+          <div style={{display:"grid",gridTemplateColumns:cdM?"1fr":"1fr 1fr",gap:10}}>
+            {boletosDe(client,period,config).map(({id:org,label,color:col,logo,vto:vtoDef,auto})=>{
               const bol=getBoleto(org);
-              return<div key={org} style={{border:`1px solid ${col}30`,borderRadius:7,padding:10,background:bol.pagado?C.ok+"08":col+"05"}}>
+              const vtoISOv=bol.vto||fechaAIso(vtoDef);
+              return<div key={org} style={{border:`1px solid ${col}30`,borderRadius:8,padding:11,background:bol.pagado?C.ok+"0e":col+"07"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7,gap:8}}>
                   <span style={{fontSize:12,fontWeight:700,color:col,fontFamily:F,display:"flex",alignItems:"center",gap:6}}><LogoRaw src={logo} size={20}/>{label}</span>
                   <div style={{display:"flex",alignItems:"center",gap:5}}>
@@ -2932,13 +3004,21 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
                   </div>
                 </div>
                 <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:7,flexWrap:"wrap"}}>
-                  <span style={{fontSize:10.5,color:C.gray,fontFamily:F}}>Vence el <b style={{color:C.navy}}>{vto}</b></span>
+                  {auto>0&&<span style={{fontSize:10.5,color:C.gray,fontFamily:F}}>Calculado: <b style={{color:C.navy,fontFamily:FN}}>$ {fU(auto,0)}</b></span>}
                   <button onClick={()=>generarBoleto(org)} style={{marginLeft:"auto",background:col+"14",color:col,border:`1px solid ${col}35`,borderRadius:5,padding:"3px 9px",fontSize:10.5,fontWeight:700,cursor:"pointer",fontFamily:F}}>{bol.generado?"Recalcular":"Generar"}</button>
                 </div>
                 {bol.detalle&&<div style={{fontSize:10,color:C.gray,fontFamily:F,background:C.card,border:`1px solid ${C.border}`,borderRadius:5,padding:"5px 7px",marginBottom:7,lineHeight:1.45}}>{bol.detalle}</div>}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:7}}>
                   <div><label style={lbl}>Monto ($)</label><NumInput value={bol.monto} onChange={v=>updBoleto(org,"monto",v)} style={inp} placeholder="0"/></div>
                   <div><label style={lbl}>N° referencia</label><input value={bol.ref||""} onChange={e=>updBoleto(org,"ref",e.target.value)} style={inp} placeholder="Nro. boleto..."/></div>
+                  <div style={{gridColumn:"1/-1"}}>
+                    <label style={lbl}>Vencimiento del boleto</label>
+                    <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                      <input type="date" value={vtoISOv} onChange={e=>updBoleto(org,"vto",e.target.value)} style={{...inp,flex:1}}/>
+                      {bol.vto&&bol.vto!==fechaAIso(vtoDef)&&<button onClick={()=>updBoleto(org,"vto","")} title="Volver a la fecha de siempre" style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:6,padding:"7px 9px",fontSize:11,cursor:"pointer",color:C.gray,fontFamily:F,whiteSpace:"nowrap"}}>↺</button>}
+                    </div>
+                    {(!bol.vto||bol.vto===fechaAIso(vtoDef))&&<div style={{fontSize:10,color:C.gray,fontFamily:F,marginTop:3}}>Es la fecha de siempre. Cambiala si el organismo prorrogó.</div>}
+                  </div>
                 </div>
                 {(client.certsDGI||[]).some(c=>!c.usado&&(c.saldoRestante||0)>0)&&<div style={{borderTop:`1px solid ${C.border}`,paddingTop:7,marginTop:4}}>
                   <div style={{fontSize:10,fontWeight:600,color:C.gray,fontFamily:F,marginBottom:5}}>Pagar con certificado DGI</div>
@@ -2955,9 +3035,9 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
               </div>;
             })}
           </div>
-          {((getBoleto("bps").monto||0)+(getBoleto("dgi").monto||0))>0&&<div style={{marginTop:10,padding:"8px 10px",background:C.blue+"10",borderRadius:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          {boletosDe(client,period,config).reduce((a,b)=>a+(+getBoleto(b.id).monto||0),0)>0&&<div style={{marginTop:10,padding:"8px 10px",background:C.blue+"10",borderRadius:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span style={{fontSize:12,color:C.navy,fontFamily:F,fontWeight:600}}>Total del mes</span>
-            <span style={{fontSize:15,color:C.blueTxt,fontWeight:800,fontFamily:F}}>${((+getBoleto("bps").monto||0)+(+getBoleto("dgi").monto||0)).toLocaleString("es-UY")}</span>
+            <span style={{fontSize:15,color:C.blueTxt,fontWeight:800,fontFamily:F}}>${boletosDe(client,period,config).reduce((a,b)=>a+(+getBoleto(b.id).monto||0),0).toLocaleString("es-UY")}</span>
           </div>}
         </div>
         {client.hasEmployees&&<div style={{background:C.card,borderRadius:10,padding:15,border:`1px solid ${C.border}`,boxShadow:SH.sm}}>
@@ -3593,7 +3673,7 @@ export default function Obligo(){
       if(!seedOk){
         const byId={};lsC.forEach(c=>{byId[c.id]=c;});
         lsC=CLIENTS_LASER.map(seed=>{const old=byId[seed.id];if(!old)return seed;
-          return{...seed,sueldos:old.sueldos||{},tramites:old.tramites||[],nominas:old.nominas||{},billing:old.billing||{},facturas:old.facturas||{},boletos:old.boletos||{},anticipos:old.anticipos||{},obPagos:old.obPagos||{},aportaciones:old.aportaciones||[],docsLeidos:old.docsLeidos||[],incidencias:old.incidencias||[],certsDGI:old.certsDGI||[],credentials:old.credentials||seed.credentials,studyFee:old.studyFee,studyFeePaid:old.studyFeePaid,notes:seed.notes};
+          return{...seed,sueldos:old.sueldos||{},tramites:old.tramites||[],nominas:old.nominas||{},billing:old.billing||{},facturas:old.facturas||{},boletos:old.boletos||{},anticipos:old.anticipos||{},obPagos:old.obPagos||{},aportaciones:old.aportaciones||[],docsLeidos:old.docsLeidos||[],giroDGI:old.giroDGI||seed.giroDGI,giroBPS:old.giroBPS||seed.giroBPS,incidencias:old.incidencias||[],certsDGI:old.certsDGI||[],credentials:old.credentials||seed.credentials,studyFee:old.studyFee,studyFeePaid:old.studyFeePaid,notes:seed.notes};
         }).concat(lsC.filter(c=>!CLIENTS_LASER.some(s=>s.id===c.id)));
         lsCfg={...lsCfg,bpc:LASER_CONFIG_DEFAULT.bpc,ui:LASER_CONFIG_DEFAULT.ui,salarioMinimo:LASER_CONFIG_DEFAULT.salarioMinimo,ivaMinimo:LASER_CONFIG_DEFAULT.ivaMinimo,iraeMinimoMensual:LASER_CONFIG_DEFAULT.iraeMinimoMensual};
         try{localStorage.setItem('ls_seed',LASER_SEED_V);localStorage.setItem('ls_clients',JSON.stringify(lsC));localStorage.setItem('ls_config',JSON.stringify(lsCfg));}catch(e){}

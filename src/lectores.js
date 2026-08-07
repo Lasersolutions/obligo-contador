@@ -240,7 +240,7 @@ export function leerCertificado(texto) {
     const per = texto.match(/Per[ií]odos de Actividad[\s\S]{0,400}?(\d{2}\/\d{2}\/\d{4})\s*\/\s*\/\s*$/m);
     if (per) set("startDate", fechaISO(per[1]));
     const act = lineaTras(lineas, /^Actividad\s+Es Principal/i).match(/^(\d{4,6})\s+(.+?)\s+(?:Si|No)\b/i);
-    if (act) set("giro", `${limpiarGiro(act[2])} — ${act[1]}`);
+    if (act) set("giroDGI", `${limpiarGiro(act[2])} — ${act[1]}`);
     const bal = lineaTras(lineas, /^Balance\b/i).match(/(\d{2}\/\d{2})\s+\d{2}\/\d{2}\/\d{4}/);
     if (bal) set("cierreBalance", bal[1]);
     if (/EMISOR\s+ELECTRONICO/i.test(texto)) set("efactura", "activo");
@@ -273,7 +273,7 @@ export function leerCertificado(texto) {
     const ini = texto.match(/Fecha Inicio:\s*(\d{2}\/\d{2}\/\d{4})/i);
     if (ini) set("startDate", fechaISO(ini[1]));
     const giro = texto.match(/(\d{4,6})\s*-\s*\d+\s*:\s*([^\n]+)/);
-    if (giro) set("giro", `${limpiarGiro(giro[2])} — ${giro[1]}`);
+    if (giro) set("giroBPS", `${limpiarGiro(giro[2])} — ${giro[1]}`);
     const tel = texto.match(/Tel[eé]fono:\s*(\d{6,})/i);
     if (tel) { set("phone", tel[1]); set("whatsapp", "+598" + tel[1].replace(/^0/, "")); }
     const dom = texto.match(/Domicilio Fiscal:\s*([^\n]+?)\s*Cod\.Postal/i);
@@ -302,7 +302,7 @@ export function leerCertificado(texto) {
     const g = texto.match(/Grupo\s*(\d+)\/\s*Subgrupo\s*(\d+)(?:\/\s*Cap[ií]tulo\s*(\d+))?/i);
     if (g) set("grupoMTSS", g[3] ? `${g[1]}/${g[2]}.${g[3]}` : `${g[1]}.${g[2]}`);
     const giro = lineaTras(lineas, /^Giro principal/i);
-    if (giro) set("giro", limpiarGiro(giro));
+    if (giro) set("giroBPS", limpiarGiro(giro));
     const tel = texto.match(/Tel[eé]fono\/fax\s*(\d{6,})/i);
     if (tel) set("phone", tel[1]);
     // Cada persona arranca en un renglón "documento · nombre · Ac. · fechas".
@@ -316,8 +316,16 @@ export function leerCertificado(texto) {
       const bloque = lineas.slice(i, i + 8).join("\n");
       const cargo = ((bloque.match(/Categoria\s+([^\n]+)/i) || [])[1] || "").trim();
       const sueldo = (bloque.match(/Remuneraci[oó]n Base:\s*\$?\s*([\d.,]+)/i) || [])[1];
+      const ci = m[1].length >= 7
+        ? m[1].slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, ".") + "-" + m[1].slice(-1)
+        : m[1];
+      const partes = m[2].replace(/\s+/g, " ").trim().split(" ");
       d.empleados.push({
-        ci: m[1],
+        ci,
+        // El BPS lista "NOMBRES APELLIDOS"; el recibo de sueldo los necesita
+        // separados para imprimir "APELLIDOS, NOMBRES".
+        nombres: partes.slice(0, 2).join(" "),
+        apellidos: partes.slice(2).join(" ") || partes.slice(-1).join(" "),
         name: m[2].replace(/\s+/g, " ").trim(),
         ingreso: fechaISO(fechas[0]),
         egreso: fechas.length >= 3 ? fechaISO(fechas[1]) : "",
