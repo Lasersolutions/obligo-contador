@@ -157,9 +157,22 @@ function pd(p){const[m,y]=p.split("/");return new Date(+y,+m-1,1);}
 function dp(d){return`${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;}
 function prevP(p){const d=pd(p);d.setMonth(d.getMonth()-1);return dp(d);}
 function nextP(p){const d=pd(p);d.setMonth(d.getMonth()+1);return dp(d);}
-// Las obligaciones de un período se pagan al mes siguiente: lo de julio vence en agosto
-function vtoDGI(p,dia){return`${String(dia||22).padStart(2,"0")}/${nextP(p)}`;}
-function vtoBPS(p,dia){return`${String(dia||10).padStart(2,"0")}/${nextP(p)}`;}
+// Las obligaciones de un período se pagan al mes siguiente: lo de julio vence en agosto.
+// Calendario general de vencimientos de DGI 2026 (gub.uy), ya con las prórrogas de las
+// resoluciones 956, 1168 y 1412/2026. El día sale del mes de pago y del grupo del
+// contribuyente: CEDE o NO CEDE. En 2026 no cambia según el dígito del RUT.
+const VTO_DGI={2026:{
+  cede:  [22,23,23,23,25,23,22,24,22,22,23,22],
+  nocede:[26,25,25,27,25,25,28,26,25,26,25,28],
+}};
+// El BPS pagado por internet vence siempre el 21, sin importar el mes.
+const DIA_BPS_WEB=21;
+function vtoDGI(p,dia,grupo){
+  const n=nextP(p);const[mm,yy]=n.split("/").map(Number);
+  const tabla=(VTO_DGI[yy]||{})[grupo==="cede"?"cede":"nocede"];
+  return`${String(tabla?tabla[mm-1]:(dia||22)).padStart(2,"0")}/${n}`;
+}
+function vtoBPS(p,dia){return`${String(dia||DIA_BPS_WEB).padStart(2,"0")}/${nextP(p)}`;}
 function vtoISO(v){const[d,mm,y]=(v||"").split("/");return y?`${y}-${mm}-${d}`:"";}
 const fechaAIso=vtoISO;                                   // DD/MM/AAAA → AAAA-MM-DD
 const isoAFecha=(v)=>v?v.split("-").reverse().join("/"):""; // y la vuelta
@@ -339,7 +352,7 @@ function boletosDe(client,period,config){
   const out=[];
   if(obs.some(o=>(o.org||"").includes("DGI")))
     out.push({id:"dgi",org:"DGI",label:"DGI — Boleto 2908",corto:"DGI",logo:LOGO_DGI,color:C.red,
-      vto:vtoDGI(period,config?.diaDGI),auto:calc2908(client,config,period).total});
+      vto:vtoDGI(period,config?.diaDGI,client.grupoDGI),auto:calc2908(client,config,period).total});
   if(obs.some(o=>(o.org||"").includes("BPS"))){
     const vb=vtoBPS(period,config?.diaBPS);
     if(bpsDoble(client)){
@@ -388,7 +401,7 @@ const mk=(id,name,entityType,nature,taxes,opts={})=>{
   delete o.certDGI;delete o.certDGINum;delete o.certDGIImporte;delete o.certDGIEmision;delete o.certsDGI;
   return{id,name,entityType,nature,taxes,status:"activo",
     rut:"",cedula:"",numEmpresa:"",phone:"",whatsapp:"+598",email:"",
-    giro:"",giroDGI:"",giroBPS:"",startDate:"",hasEmployees:false,employees:[],bpsDoble:null,
+    giro:"",giroDGI:"",giroBPS:"",startDate:"",hasEmployees:false,employees:[],bpsDoble:null,grupoDGI:"nocede",
     efactura:"activo",specialTaxes:[],
     studyFee:null,studyFeePaid:false,studyFeeDate:null,studyFeeNotes:"",
     billing:{},nominas:{},facturas:{},
@@ -405,6 +418,13 @@ const AL_DIA_HASTA="2026-07-30";
 const CLEANUP_V="1";
 // Subir esta versión vuelve a aplicar los valores fiscales del año a la config de VC
 const VC_VALORES_V="2026";
+// Las configuraciones guardadas traían el BPS al día 10. Pagando por internet vence
+// el 21, así que se corrige una sola vez por estudio.
+const VTOS_V="2026";
+function migrarVtos(cfg,clave){
+  try{if(localStorage.getItem(clave)===VTOS_V)return cfg;localStorage.setItem(clave,VTOS_V);}catch(e){return cfg;}
+  return{...cfg,diaBPS:DIA_BPS_WEB};
+}
 function marcarAlDia(list){
   return (list||[]).map(c=>({...c,tasks:(c.tasks||[]).map(t=>(t.due&&t.due<=AL_DIA_HASTA&&!t.done)?{...t,done:true}:t)}));
 }
@@ -492,6 +512,8 @@ const normClient=(c)=>({
   anticipos:c.anticipos||{},obPagos:c.obPagos||{},
   aportaciones:Array.isArray(c.aportaciones)?c.aportaciones:[],docsLeidos:Array.isArray(c.docsLeidos)?c.docsLeidos:[],
   giroDGI:c.giroDGI||"",giroBPS:c.giroBPS||"",
+  // Casi todos los clientes de estudio son NO CEDE; los CEDE se marcan a mano en Datos
+  grupoDGI:c.grupoDGI==="cede"?"cede":"nocede",
   credentials:c.credentials||mkCred(),
 });
 const CLIENTS_LASER=marcarAlDia([
@@ -554,7 +576,7 @@ const CLIENTS_LASER=marcarAlDia([
 ]);
 // Valores vigentes 2026: BPC $6.864 (Dec. 11/026) · SMN $24.572 (Dec. 319/025; desde 1/7/2026: $25.383)
 // IVA Mínimo $5.910 e IRAE mínimo $6.840 (Dec. 310/025) · UI al 12/06/2026: $6,5720 (ajusta a diario, ver BCU/INE)
-const LASER_CONFIG_DEFAULT={studioName:"Laser Solutions",studioCode:"LaserSolutions",studioRut:"",studioEmail:"sales@lasersolutions.com",studioPhone:"",adminPass:"laser2026",secretariaPass:"ayud123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000,cotizaciones:[]};
+const LASER_CONFIG_DEFAULT={studioName:"Laser Solutions",studioCode:"LaserSolutions",studioRut:"",studioEmail:"sales@lasersolutions.com",studioPhone:"",adminPass:"laser2026",secretariaPass:"ayud123",diaDGI:22,diaBPS:DIA_BPS_WEB,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000,cotizaciones:[]};
 const LASER_SEED_V="6";
 
 // ─── ETIQUETAS ESPECIALES (Solo Web / Solo Marketing / Convenio pendiente) ───
@@ -1951,7 +1973,7 @@ function SueldosModule({client,upd,period,config}){
 
 // ─── REPORTE PDF PARA CLIENTES (estética Laser Solutions) ─────────
 // Arma las líneas de obligaciones del mes según el régimen del cliente; los montos se pueden editar antes de generar
-function buildLineasEmpresa(c,period,config){
+function buildLineasEmpresa(c,period,config,conHonorarios){
   const t=c.taxes||{};const lines=[];
   // Si el estudio ya cargó el boleto en Pagos / trámites, ese importe y ese
   // vencimiento son los que van al reporte: es el papel que el cliente tiene
@@ -1959,8 +1981,8 @@ function buildLineasEmpresa(c,period,config){
   const cargados=(c.boletos||{})[period]||{};
   const impCargado=(id)=>{const g=cargados[id]||{};return g.monto!=null&&g.monto!==""?+g.monto:null;};
   const vtoCargado=(id,def)=>{const g=cargados[id]||{};return g.vto?isoAFecha(g.vto):def;};
-  const dgiDue=vtoCargado("dgi",`${String(config?.diaDGI||22).padStart(2,"0")}/${nextP(period)}`);
-  const bpsDue=`${String(config?.diaBPS||10).padStart(2,"0")}/${nextP(period)}`;
+  const dgiDue=vtoCargado("dgi",vtoDGI(period,config?.diaDGI,c.grupoDGI));
+  const bpsDue=vtoBPS(period,config?.diaBPS);
   const calc=calcAnticipos(c,period,config);
   // Los importes salen del mismo boleto 2908 que ve el estudio, con los ajustes a mano incluidos
   const b2908=calc2908(c,config,period);
@@ -2002,7 +2024,16 @@ function buildLineasEmpresa(c,period,config){
   });
   if(c.efactura==="activo")lines.push({org:"DGI",label:"Facturación electrónica: emisor activo — sin pago, control de CFE al día",due:"",amount:null});
   if(c.efactura==="pendiente")lines.push({org:"DGI",label:"Facturación electrónica: ALTA PENDIENTE de gestionar",due:"",amount:null});
+  if(conHonorarios){const h=lineaHonorario(c,period);if(h)lines.push(h);}
   return lines;
+}
+// Los honorarios del estudio no son una obligación ante un organismo, así que van
+// aparte y sólo si el estudio los quiere mostrar.
+function lineaHonorario(c,period){
+  const monto=+c.studyFee||0;
+  if(!monto)return null;
+  return{org:"Estudio",honorario:true,label:`Honorarios del estudio — ${periodoLargo(period)}`,
+    due:c.studyFeeDate?isoAFecha(c.studyFeeDate):"",amount:monto};
 }
 // Identidad del estudio activo, para que el PDF salga con la marca que corresponde
 function marcaEstudio(){
@@ -2013,7 +2044,7 @@ function marcaEstudio(){
 function generarReportePDF(empresas,period,config,notaGeneral){
   const B=marcaEstudio();
   const tot=empresas.reduce((a,e)=>a+e.lines.reduce((x,l)=>x+(+l.amount||0),0),0);
-  const orgColor={DGI:"#B91C1C",BPS:"#1D4ED8",BSE:"#B45309",Otro:"#475569"};
+  const orgColor={DGI:"#B91C1C",BPS:"#1D4ED8",BSE:"#B45309",Estudio:B.acento,Otro:"#475569"};
   const secciones=empresas.map(({client,lines,nota})=>{
     const sub=lines.reduce((x,l)=>x+(+l.amount||0),0);
     return`<div class="empresa">
@@ -2081,12 +2112,27 @@ function generarReportePDF(empresas,period,config,notaGeneral){
 }
 function ReporteModal({clients,initialIds,period,config,onClose}){
   const {m:rpM}=useR();
+  // Los honorarios del estudio se incluyen o no; la elección queda guardada
+  const [honorarios,setHonorarios]=useState(()=>{try{return localStorage.getItem("obligo_rep_honorarios")==="1";}catch(e){return false;}});
   const [sel,setSel]=useState(()=>{
-    const o={};(initialIds||[]).forEach(id=>{const c=clients.find(x=>x.id===id);if(c)o[id]={lines:buildLineasEmpresa(c,period,config),nota:""};});
+    const hon=(()=>{try{return localStorage.getItem("obligo_rep_honorarios")==="1";}catch(e){return false;}})();
+    const o={};(initialIds||[]).forEach(id=>{const c=clients.find(x=>x.id===id);if(c)o[id]={lines:buildLineasEmpresa(c,period,config,hon),nota:""};});
     return o;
   });
   const [notaGeneral,setNotaGeneral]=useState("");
-  const toggle=(c)=>setSel(p=>{const n={...p};if(n[c.id])delete n[c.id];else n[c.id]={lines:buildLineasEmpresa(c,period,config),nota:""};return n;});
+  const toggle=(c)=>setSel(p=>{const n={...p};if(n[c.id])delete n[c.id];else n[c.id]={lines:buildLineasEmpresa(c,period,config,honorarios),nota:""};return n;});
+  // Al prender o apagar la opción se agrega o se saca la línea, sin tocar lo ya editado
+  const toggleHonorarios=()=>{
+    const v=!honorarios;setHonorarios(v);
+    try{localStorage.setItem("obligo_rep_honorarios",v?"1":"0");}catch(e){}
+    setSel(p=>{const n={};Object.keys(p).forEach(id=>{
+      const c=clients.find(x=>x.id===+id);
+      const sinHon=p[id].lines.filter(l=>!l.honorario);
+      const h=v&&c?lineaHonorario(c,period):null;
+      n[id]={...p[id],lines:h?[...sinHon,h]:sinHon};
+    });return n;});
+  };
+  const conHonorario=Object.keys(sel).filter(id=>{const c=clients.find(x=>x.id===+id);return c&&+c.studyFee>0;}).length;
   const updLine=(cid,i,patch)=>setSel(p=>({...p,[cid]:{...p[cid],lines:p[cid].lines.map((l,j)=>j===i?{...l,...patch}:l)}}));
   const delLine=(cid,i)=>setSel(p=>({...p,[cid]:{...p[cid],lines:p[cid].lines.filter((_,j)=>j!==i)}}));
   const addLine=(cid)=>setSel(p=>({...p,[cid]:{...p[cid],lines:[...p[cid].lines,{org:"DGI",label:"",due:"",amount:null}]}}));
@@ -2107,6 +2153,15 @@ function ReporteModal({clients,initialIds,period,config,onClose}){
       <div style={{padding:"12px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",gap:6,flexWrap:"wrap"}}>
         {clients.filter(c=>c.status!=="inactivo").map(c=><button key={c.id} onClick={()=>toggle(c)} style={{padding:"5px 11px",borderRadius:99,border:`1.5px solid ${sel[c.id]?C.blue:C.border}`,background:sel[c.id]?C.blue:"transparent",color:sel[c.id]?"#fff":C.gray,fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:F}}>{sel[c.id]?"✓ ":""}{c.name}</button>)}
       </div>
+      <div style={{padding:"9px 18px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:9}}>
+        <Check checked={honorarios} onChange={toggleHonorarios} color={C.blue}/>
+        <div>
+          <div style={{fontSize:12.5,color:C.navy,fontFamily:F,fontWeight:600}}>Incluir los honorarios del estudio</div>
+          <div style={{fontSize:11,color:C.gray,fontFamily:F}}>
+            {conHonorario?`${conHonorario} de las empresas elegidas tiene honorario cargado.`:"Se carga en la pestaña Comercial de cada cliente."}
+          </div>
+        </div>
+      </div>
       <div style={{flex:1,overflowY:"auto",padding:"12px 18px",display:"flex",flexDirection:"column",gap:14,background:C.bg}}>
         {Object.keys(sel).length===0&&<div style={{textAlign:"center",color:C.gray,fontSize:12.5,fontFamily:F,padding:24}}>Seleccioná al menos una empresa arriba.</div>}
         {Object.keys(sel).map(id=>{const c=clients.find(x=>x.id===+id);if(!c)return null;const s=sel[id];
@@ -2114,7 +2169,7 @@ function ReporteModal({clients,initialIds,period,config,onClose}){
             <div style={{background:C.raised,color:"#fff",padding:"7px 12px",fontWeight:700,fontSize:12.5,fontFamily:F}}>{c.name}</div>
             <div style={{padding:"9px 12px"}}>
               {s.lines.map((l,i)=><div key={i} style={{display:"flex",gap:6,marginBottom:5,alignItems:"center",flexWrap:rpM?"wrap":"nowrap"}}>
-                <select value={l.org} onChange={e=>updLine(+id,i,{org:e.target.value})} style={{...inp,width:64,padding:"4px 5px",fontSize:11}}><option>DGI</option><option>BPS</option><option>BSE</option><option>Otro</option></select>
+                <select value={l.org} onChange={e=>updLine(+id,i,{org:e.target.value})} style={{...inp,width:64,padding:"4px 5px",fontSize:11}}><option>DGI</option><option>BPS</option><option>BSE</option><option>Estudio</option><option>Otro</option></select>
                 <input value={l.label} onChange={e=>updLine(+id,i,{label:e.target.value})} placeholder="Concepto" style={{...inp,flex:1,minWidth:140,padding:"4px 7px",fontSize:11.5}}/>
                 <input value={l.due} onChange={e=>updLine(+id,i,{due:e.target.value})} placeholder="dd/mm/aaaa" style={{...inp,width:88,padding:"4px 6px",fontSize:11}}/>
                 <input type="number" value={l.amount??""} onChange={e=>updLine(+id,i,{amount:e.target.value===""?null:+e.target.value})} placeholder="$" style={{...inp,width:96,padding:"4px 6px",fontSize:11.5,textAlign:"right"}}/>
@@ -2156,7 +2211,7 @@ function CalculoMes({client,upd,updTax,period,config}){
     <div style={{background:C.raised,padding:"11px 15px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
       <div style={{flex:1,minWidth:190}}>
         <div style={{color:"#fff",fontWeight:700,fontSize:14,fontFamily:F}}>Cálculo del mes — {periodoLargo(period)}</div>
-        <div style={{color:"#8ECBDE",fontSize:11,fontFamily:F,marginTop:2}}>Cargá la facturación y el resto se calcula solo. Vence el {vtoDGI(period,config?.diaDGI)}.</div>
+        <div style={{color:"#8ECBDE",fontSize:11,fontFamily:F,marginTop:2}}>Cargá la facturación y el resto se calcula solo.</div>
       </div>
       <button onClick={()=>setVerParams(p=>!p)} style={{background:"#ffffff1a",color:"#fff",border:"1px solid #ffffff33",borderRadius:8,padding:"6px 12px",fontSize:11.5,fontWeight:600,cursor:"pointer",fontFamily:F}}>{verParams?"Ocultar parámetros":"Parámetros"}</button>
     </div>
@@ -2176,15 +2231,14 @@ function CalculoMes({client,upd,updTax,period,config}){
         <div>
           <label style={lbl}>Facturación del mes — ventas netas ($)</label>
           {inNum(b.ventas,v=>setB({ventas:v}),"0")}
-          <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>Es la base del IRAE por coeficiente.</div>
+          
         </div>
         {r.tasa>0&&<div>
           <label style={lbl}>IVA ventas del mes ($)</label>
           {inNum(b.ivaVentas,v=>setB({ivaVentas:v}),String(Math.round(r.ventas*r.tasa)))}
           <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>
-            {b.ivaVentas!=null&&b.ivaVentas!==""
-              ?<>Cargado a mano: <b style={{color:C.navy}}>{money(r.ivaVentas)}</b>. Vacío = {Math.round(r.tasa*100)}% de la facturación.</>
-              :<>Se calcula solo: {Math.round(r.tasa*100)}% = <b style={{color:C.navy}}>{money(r.ivaVentas)}</b>. Si tenés el dato exacto del reporte de e-facturas, cargalo acá.</>}
+            {b.ivaVentas!=null&&b.ivaVentas!==""?<>A mano. Vacío = {Math.round(r.tasa*100)}% de la facturación.</>
+              :<>Vacío se calcula solo: {money(r.ivaVentas)}.</>}
           </div>
         </div>}
         <div><label style={lbl}>IVA compras del mes ($)</label>{inNum(b.ivaCompras,v=>setB({ivaCompras:v}),"0")}</div>
@@ -2192,10 +2246,10 @@ function CalculoMes({client,upd,updTax,period,config}){
         <div>
           <label style={lbl}>Excedente del mes anterior ($)</label>
           {inNum(b.excedenteManual,v=>setB({excedenteManual:v}),String(Math.round(r.excedentePrev)))}
-          <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>Se arrastra solo del mes anterior. Completá sólo si querés pisarlo.</div>
+          <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>Se arrastra solo del mes anterior.</div>
         </div>
         {t.renta==="irae"&&<div><label style={lbl}>Venta de activo fijo ($)</label>{inNum(b.vtaActFijo,v=>setB({vtaActFijo:v}),"0")}
-          <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>Se suma a la facturación sólo para el IRAE.</div></div>}
+          </div>}
       </div>
 
       <div>
@@ -2252,7 +2306,7 @@ function CalculoMes({client,upd,updTax,period,config}){
         <div style={{background:C.raised,borderRadius:9,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap"}}>
           <div>
             <div style={{color:"#8ECBDE",fontSize:10,fontWeight:700,letterSpacing:1,fontFamily:F}}>TOTAL A PAGAR</div>
-            <div style={{color:"#ffffffaa",fontSize:10.5,fontFamily:F,marginTop:2}}>vence el {vtoDGI(period,config?.diaDGI)}</div>
+            <div style={{color:"#ffffffaa",fontSize:10.5,fontFamily:F,marginTop:2}}>vence el {vtoDGI(period,config?.diaDGI,client.grupoDGI)}</div>
           </div>
           <div style={{color:"#fff",fontSize:22,fontWeight:800,fontFamily:FN,fontVariantNumeric:"tabular-nums"}}>{money(r.total)}</div>
         </div>
@@ -2505,9 +2559,13 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
   const [newTram,setNewTram]=useState({titulo:"",estado:"pendiente",comentario:""});
   const importFactRef=useRef();
   const [addingCertTrib,setAddingCertTrib]=useState(false);
+  const [verCerts,setVerCerts]=useState(false);
   const [newCertTrib,setNewCertTrib]=useState({num:"",importe:"",vencimiento:""});
   const [addingInc,setAddingInc]=useState(false);
   const [newInc,setNewInc]=useState({texto:"",tipo:"nota"});
+  // Si el mensaje de importes lleva también los honorarios del estudio
+  const [waHon,setWaHon]=useState(()=>{try{return localStorage.getItem("obligo_wa_honorarios")==="1";}catch(e){return false;}});
+  const toggleWaHon=()=>setWaHon(v=>{const n=!v;try{localStorage.setItem("obligo_wa_honorarios",n?"1":"0");}catch(e){}return n;});
   const [certBoletoOrg,setCertBoletoOrg]=useState("");
   const [certBoletoIdx,setCertBoletoIdx]=useState(-1);
   const [certBoletoMonto,setCertBoletoMonto]=useState("");
@@ -2586,6 +2644,12 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
       tot+=m;
       lineas.push(`${b.label} (vence ${g.vto?isoAFecha(g.vto):b.vto}): $${m.toLocaleString("es-UY")}${g.ref?` - Ref: ${g.ref}`:""}`);
     });
+    // Los honorarios del estudio se suman sólo si el estudio los quiere mandar
+    const hon=waHon?+client.studyFee||0:0;
+    if(hon){
+      tot+=hon;
+      lineas.push(`Honorarios del estudio${client.studyFeeDate?` (vence ${isoAFecha(client.studyFeeDate)})`:""}: $${hon.toLocaleString("es-UY")}`);
+    }
     if(tot>0)lineas.push(`*Total: $${tot.toLocaleString("es-UY")}*`);
     return["Hola *"+client.name+"*, importes del período *"+period+"*:","",
       lineas.join("\n"),"","Saludos, "+(config.studioName||"Estudio")].join("\n");
@@ -2729,6 +2793,13 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           <div><label style={lbl}>IVA</label><select value={client.taxes?.iva||"no_aplica"} onChange={e=>updTax("iva",e.target.value)} style={inp}>{IVA_OPT.map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
           <div><label style={lbl}>Patrimonio (IP)</label><select value={client.taxes?.patrimonio?"aplica":"no_aplica"} onChange={e=>updTax("patrimonio",e.target.value==="aplica")} style={inp}><option value="no_aplica">No aplica</option><option value="aplica">Aplica (1,5%)</option></select></div>
           <div><label style={lbl}>e-Factura</label><select value={client.efactura} onChange={e=>upd("efactura",e.target.value)} style={inp}>{[["activo","Activo"],["pendiente","Pendiente"],["no_aplica","No aplica"],["exceptuado","Exceptuado"]].map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div>
+          {/* De acá sale el día de vencimiento: el calendario de DGI es distinto para CEDE y NO CEDE */}
+          <div><label style={lbl}>Grupo ante DGI</label>
+            <select value={client.grupoDGI==="cede"?"cede":"nocede"} onChange={e=>upd("grupoDGI",e.target.value)} style={inp}>
+              <option value="nocede">NO CEDE</option><option value="cede">CEDE</option>
+            </select>
+            <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>Vence el {vtoDGI(period,config?.diaDGI,client.grupoDGI).slice(0,2)} de cada mes.</div>
+          </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}><Check checked={client.hasEmployees} onChange={()=>upd("hasEmployees",!client.hasEmployees)}/><span style={{fontSize:13,color:C.navy,fontFamily:F}}>Tiene empleados</span></div>
           {/* Los servicios personales no profesionales reciben dos facturas del
               BPS: la de FONASA y la de Industria y Comercio. */}
@@ -2876,6 +2947,19 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
       {tab==="sueldos"&&<SueldosModule client={client} upd={upd} period={period} config={config}/>}
 
       {tab==="tributario"&&<div style={{display:"flex",flexDirection:"column",gap:12}}>
+        {/* Una sola barra de contexto: régimen y avance del mes */}
+        <div style={{background:C.card,borderRadius:8,padding:"8px 12px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",boxShadow:SH.sm}}>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",flex:1,minWidth:170}}>
+            {[[RENTA_OPT.find(([k])=>k===client.taxes?.renta)?.[1],C.navy],
+              [IVA_OPT.find(([k])=>k===client.taxes?.iva)?.[1],C.blueTxt],
+              [client.taxes?.patrimonio?"Patrimonio 1,5%":null,C.warnTxt]]
+              .filter(([v])=>v&&v!=="No aplica").map(([v,col])=>
+              <span key={v} style={{display:"inline-flex",alignItems:"center",gap:5,fontSize:11,color:C.gray,fontFamily:F,background:C.sunken,borderRadius:99,padding:"3px 9px"}}>
+                <span style={{width:6,height:6,borderRadius:"50%",background:col,flexShrink:0}}/>{v}
+              </span>)}
+          </div>
+          <span style={{fontSize:11,color:C.gray,fontFamily:F}}>{obs.filter(o=>getOb(o.id,"paid")).length} de {obs.length} pagadas</span>
+        </div>
         {isConf(client)&&<CalculoMes client={client} upd={upd} updTax={updTax} period={period} config={config}/>}
         {(()=>{
           if(!client.cierreBalance)return null;
@@ -2898,15 +2982,11 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
             </div>
           </div>;
         })()}
-        <div style={{background:C.card,borderRadius:8,padding:12,display:"flex",gap:10,flexWrap:"wrap",boxShadow:SH.sm}}>
-          {[["Renta",RENTA_OPT.find(([k])=>k===client.taxes?.renta)?.[1]||"–",C.navy],["IVA",IVA_OPT.find(([k])=>k===client.taxes?.iva)?.[1]||"–",C.blue],["Patrimonio",client.taxes?.patrimonio?"Aplica (1,5%)":"No aplica",client.taxes?.patrimonio?C.warnTxt:C.gray]].map(([l,v,col])=><div key={l} style={{flex:1,minWidth:130,borderLeft:`3px solid ${col}`,paddingLeft:10}}><div style={{fontSize:10,color:C.gray,fontFamily:F}}>{l}</div><div style={{fontSize:12,fontWeight:600,color:col,fontFamily:F}}>{v}</div></div>)}
-        </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:12,color:C.gray,fontFamily:F}}>Período:</span><PeriodNav period={period} setPeriod={setPeriod} inline/><span style={{fontSize:11,color:C.gray,fontFamily:F}}>{obs.length} obligaciones · {obs.filter(o=>getOb(o.id,"paid")).length} pagadas</span></div>
         {items2908.length>0&&(()=>{const bolDGI=getBoleto("dgi");const alDia=bolDGI.generado&&(+bolDGI.monto||0)===total2908;
           return<div style={{background:C.card,border:`1px solid ${C.blue}30`,borderRadius:8,padding:14,boxShadow:SH.sm}}>
           <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:4,display:"flex",alignItems:"center",gap:8,fontFamily:F}}>
             <div style={{width:4,height:14,background:C.blue,borderRadius:2}}/>Boleto 2908 — {period}
-            <span style={{marginLeft:"auto",fontSize:11,color:C.gray,fontWeight:400}}>Vence el {vtoDGI(period,config.diaDGI)}</span>
+            <span style={{marginLeft:"auto",fontSize:11,color:C.gray,fontWeight:400}}>Vence el {vtoDGI(period,config.diaDGI,client.grupoDGI)}</span>
           </div>
           <div style={{fontSize:11,color:C.gray,fontFamily:F,marginBottom:9}}>Los importes se calculan solos. Si necesitás otro número para este mes, escribilo y queda guardado sólo para {period}.</div>
           {items2908.map((it,i)=><div key={it.key} style={{display:"flex",alignItems:"center",gap:9,padding:"7px 10px",background:it.manual?C.warn+"0e":C.bg,border:`1px solid ${it.manual?C.warn+"40":"transparent"}`,borderRadius:6,marginBottom:4}}>
@@ -2927,15 +3007,26 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
           </div>
           {alDia&&<div style={{fontSize:11,color:C.okTxt,fontFamily:F,marginTop:7}}>Cargado en <b>Pagos / Trámites</b> el {bolDGI.generado.split("-").reverse().join("/")}. Ahí se marca como pagado y se le avisa al cliente.</div>}
         </div>;})()}
-        {/* ── Certificados de crédito DGI ── */}
-        <div style={{background:C.card,borderRadius:10,padding:15,border:`1px solid ${C.border}`,boxShadow:SH.sm}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-            <div style={{fontWeight:600,color:C.navy,fontSize:13,fontFamily:F,display:"flex",alignItems:"center",gap:7}}>
-              <div style={{width:4,height:14,background:C.teal,borderRadius:2}}/>Certificados de Crédito DGI
+        {/* ── Certificados de crédito DGI: plegado, que la mayoría de los clientes no tiene ── */}
+        {(()=>{
+          const certs=client.certsDGI||[];
+          const saldo=certs.filter(c=>!c.usado).reduce((a,c)=>a+(+c.saldoRestante||0),0);
+          const abierto=verCerts||addingCertTrib;
+          return<div style={{background:C.card,borderRadius:10,border:`1px solid ${C.border}`,boxShadow:SH.sm,overflow:"hidden"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,padding:abierto?"13px 15px 10px":"13px 15px",borderBottom:abierto?`1px solid ${C.border}`:"none"}}>
+              <button onClick={()=>setVerCerts(v=>!v)} aria-expanded={abierto} style={{flex:1,display:"flex",alignItems:"center",gap:8,background:"transparent",border:"none",cursor:"pointer",textAlign:"left",padding:0,fontFamily:F}}>
+                <span style={{color:C.gray,display:"flex",transform:abierto?"rotate(90deg)":"none",transition:"transform .15s"}}>
+                  <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7"/></svg>
+                </span>
+                <span style={{fontWeight:600,color:C.navy,fontSize:13,fontFamily:F}}>Certificados de crédito DGI</span>
+                <span style={{fontSize:11.5,color:C.gray,fontFamily:F}}>
+                  {certs.length===0?"ninguno cargado":`${certs.length} · saldo $ ${fU(saldo,0)}`}
+                </span>
+              </button>
+              {abierto&&<button onClick={()=>setAddingCertTrib(p=>!p)} style={{background:C.teal+"20",color:C.teal,border:`1px solid ${C.teal}40`,borderRadius:5,padding:"4px 12px",fontSize:11,cursor:"pointer",fontFamily:F}}>+ Agregar</button>}
             </div>
-            <button onClick={()=>setAddingCertTrib(p=>!p)} style={{background:C.teal+"20",color:C.teal,border:`1px solid ${C.teal}40`,borderRadius:5,padding:"4px 12px",fontSize:11,cursor:"pointer",fontFamily:F}}>+ Agregar</button>
-          </div>
-          {addingCertTrib&&<div style={{background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.teal}40`,marginBottom:10}}>
+            {abierto&&<div style={{padding:"12px 15px 15px"}}>
+              {addingCertTrib&&<div style={{background:C.bg,borderRadius:7,padding:12,border:`1px solid ${C.teal}40`,marginBottom:10}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:9}}>
               <div><label style={lbl}>N° de certificado</label><input value={newCertTrib.num} onChange={e=>setNewCertTrib(p=>({...p,num:e.target.value}))} style={inp} placeholder="Ej: 2554112"/></div>
               <div><label style={lbl}>Monto ($)</label><input type="number" value={newCertTrib.importe} onChange={e=>setNewCertTrib(p=>({...p,importe:e.target.value}))} style={inp} placeholder="150000"/></div>
@@ -2970,41 +3061,43 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
                 </div>;
               })}
             </div>}
-        </div>
-        {(client.certsDGI||[]).some(c=>!c.usado&&(c.saldoRestante||0)>0)&&<div style={{background:C.card,border:`1px solid ${C.ok}30`,borderRadius:8,padding:14,boxShadow:SH.sm}}>
-          <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:10,display:"flex",alignItems:"center",gap:8,fontFamily:F}}>
-            <div style={{width:4,height:14,background:C.ok,borderRadius:2}}/>Pagar 2908 con certificado DGI
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:8,alignItems:"end",marginBottom:10}}>
-            <div>
-              <label style={lbl}>Certificado</label>
-              <select value={certPagoIdx} onChange={e=>setCertPagoIdx(+e.target.value)} style={inp}>
-                <option value={-1}>— seleccionar —</option>
-                {(client.certsDGI||[]).map((c,i)=>!c.usado&&(c.saldoRestante||0)>0?<option key={i} value={i}>Nº {c.num||`Cert ${i+1}`} – Saldo: $ {(c.saldoRestante||0).toLocaleString("es-UY")}</option>:null)}
-              </select>
+              {saldo>0&&<div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+                <div style={{fontSize:11.5,color:C.gray,fontFamily:F,marginBottom:7}}>Descontar un certificado del saldo (para aplicarlo a un boleto concreto, hacelo desde Pagos / trámites).</div>
+                <div style={{display:"grid",gridTemplateColumns:cdM?"1fr":"1fr 1fr auto",gap:8,alignItems:"end"}}>
+                  <div>
+                    <label style={lbl}>Certificado</label>
+                    <select value={certPagoIdx} onChange={e=>setCertPagoIdx(+e.target.value)} style={inp}>
+                      <option value={-1}>— seleccionar —</option>
+                      {certs.map((c,i)=>!c.usado&&(c.saldoRestante||0)>0?<option key={i} value={i}>Nº {c.num||`Cert ${i+1}`} – Saldo: $ {(c.saldoRestante||0).toLocaleString("es-UY")}</option>:null)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={lbl}>Monto a aplicar ($)</label>
+                    <input type="number" value={certPagoMonto} onChange={e=>setCertPagoMonto(e.target.value)} style={inp} placeholder={certPagoIdx>=0?(certs[certPagoIdx]?.saldoRestante||0).toString():""}/>
+                  </div>
+                  <button onClick={()=>{if(certPagoIdx<0||!certPagoMonto)return;const monto=Math.min(+certPagoMonto,certs[certPagoIdx]?.saldoRestante||0);const a=[...certs];const cc=a[certPagoIdx];const ns=(cc.saldoRestante||0)-monto;a[certPagoIdx]={...cc,saldoRestante:Math.max(0,ns),usado:ns<=0};upd("certsDGI",a);setCertPagoMonto("");setCertPagoIdx(-1);}} style={{padding:"7px 14px",background:C.ok+"20",color:C.okTxt,border:`1px solid ${C.ok}40`,borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:F}}>Aplicar</button>
+                </div>
+              </div>}
+            </div>}
+          </div>;
+        })()}
+        {!isConf(client)?<div style={{background:C.warnBg,border:`1px solid ${C.warnBorder}`,borderRadius:8,padding:18,textAlign:"center",color:C.warnInk,fontSize:13,fontFamily:F}}>Configure los impuestos en "Datos".</div>
+          :<div style={{background:C.card,borderRadius:10,padding:15,border:`1px solid ${C.border}`,boxShadow:SH.sm}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <span style={{fontWeight:600,color:C.navy,fontSize:13,fontFamily:F}}>Obligaciones del período</span>
+              <span style={{fontSize:11,color:C.gray,fontFamily:F}}>DGI el {vtoDGI(period,config.diaDGI,client.grupoDGI)} · BPS el {vtoBPS(period,config.diaBPS)}</span>
+              <div style={{marginLeft:"auto",display:"flex",gap:14,fontSize:11,color:C.gray,fontFamily:F}}>Pagado&nbsp;&nbsp;Notif.</div>
             </div>
-            <div>
-              <label style={lbl}>Monto a aplicar ($)</label>
-              <input type="number" value={certPagoMonto} onChange={e=>setCertPagoMonto(e.target.value)} style={inp} placeholder={certPagoIdx>=0?(client.certsDGI[certPagoIdx]?.saldoRestante||0).toString():""}/>
-            </div>
-            <button onClick={()=>{if(certPagoIdx<0||!certPagoMonto)return;const monto=Math.min(+certPagoMonto,client.certsDGI[certPagoIdx]?.saldoRestante||0);const certs=[...client.certsDGI];const cc=certs[certPagoIdx];const nuevoSaldo=(cc.saldoRestante||0)-monto;certs[certPagoIdx]={...cc,saldoRestante:Math.max(0,nuevoSaldo),usado:nuevoSaldo<=0};upd("certsDGI",certs);setCertPagoMonto("");setCertPagoIdx(-1);}} style={{padding:"7px 14px",background:C.ok+"20",color:C.okTxt,border:`1px solid ${C.ok}40`,borderRadius:6,fontSize:12,cursor:"pointer",fontFamily:F,alignSelf:"flex-end"}}>Aplicar</button>
-          </div>
-          {(client.certsDGI||[]).filter(c=>!c.usado&&(c.saldoRestante||0)>0).map((cert,i)=>(
-            <div key={i} style={{fontSize:12,color:C.gray,fontFamily:F,padding:"5px 0",borderTop:`1px solid ${C.border}`}}>
-              <span style={{fontWeight:600,color:C.navy}}>Nº {cert.num||`Cert ${i+1}`}</span> — Importe: $ {(cert.importe||0).toLocaleString("es-UY")} · Saldo: <span style={{color:C.okTxt,fontWeight:600}}>$ {(cert.saldoRestante||0).toLocaleString("es-UY")}</span>
-            </div>
-          ))}
-        </div>}
-        {!isConf(client)?<div style={{background:C.warnBg,border:"1px solid #FDE68A",borderRadius:8,padding:18,textAlign:"center",color:C.warnInk,fontSize:13,fontFamily:F}}>Configure los impuestos en "Datos".</div>
-          :[{list:monthlyObs,title:"Obligaciones Mensuales",color:C.blueTxt,hint:"BPS: ~día 10 · DGI: ~día 22"},{list:annualObs,title:"Obligaciones Anuales",color:C.navy},{list:specialObs,title:"Estacionales",color:C.warnTxt}].map(({list,title,color,hint})=>list.length>0&&<div key={title} style={{background:C.card,borderRadius:10,padding:15,border:`1px solid ${C.border}`,boxShadow:SH.sm}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}><div style={{width:3,height:14,borderRadius:2,background:color,flexShrink:0}}/><span style={{fontWeight:600,color:C.navy,fontSize:13,fontFamily:F}}>{title}</span>{hint&&<span style={{fontSize:11,color:C.gray,fontFamily:F}}>· {hint}</span>}<div style={{marginLeft:"auto",display:"flex",gap:14,fontSize:11,color:C.gray,fontFamily:F}}>Pagado&nbsp;&nbsp;Notif.</div></div>
-            {list.map(o=>{const paid=getOb(o.id,"paid"),notif=getOb(o.id,"notified"),blocked=o.needsNominas&&client.hasEmployees&&!allNomOk;return<div key={o.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",borderRadius:6,border:`1px solid ${paid&&notif?C.okBorder:C.border}`,background:paid&&notif?C.okBg:C.bg,marginBottom:5}}>
-              <OBadge org={o.org}/><div style={{flex:1}}><div style={{fontSize:12,color:C.navy,fontFamily:F}}>{o.label}{o.monto!=null&&o.monto>0&&<span style={{marginLeft:8,fontSize:11,color:C.okTxt,fontWeight:700}}>$ {o.monto.toLocaleString("es-UY")}</span>}</div>{blocked&&<div style={{fontSize:10,color:C.warnTxt,fontFamily:F}}>Marcar todas las nóminas antes de pagar BPS</div>}{o.form&&<span style={{fontSize:10,color:C.blueTxt,fontFamily:F}}>Form. {o.form} </span>}{o.autoCalc&&<span style={{fontSize:10,color:C.okTxt,fontFamily:F}}>Cálculo auto</span>}</div>
-              {o.url&&<button onClick={()=>openUrl(EXT[o.url])} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:3,padding:"2px 7px",fontSize:10,cursor:"pointer",color:C.blueTxt,fontFamily:F}}>{o.url.toUpperCase()} ↗</button>}
-              {blocked?<div style={{opacity:.3}}><Check checked={paid} onChange={()=>{}} color={C.ok}/></div>:<Check checked={paid} onChange={()=>setOb(o.id,"paid")} color={C.ok}/>}
-              <Check checked={notif} onChange={()=>setOb(o.id,"notified")} color={C.blue}/>
-            </div>;})}
-          </div>)}
+            {[{list:monthlyObs,title:"Mensuales"},{list:annualObs,title:"Anuales"},{list:specialObs,title:"Estacionales"}].map(({list,title})=>list.length>0&&<div key={title} style={{marginTop:10}}>
+              <div style={{fontSize:10,fontWeight:800,letterSpacing:1,color:C.dim,fontFamily:F,marginBottom:5}}>{title.toUpperCase()}</div>
+              {list.map(o=>{const paid=getOb(o.id,"paid"),notif=getOb(o.id,"notified"),blocked=o.needsNominas&&client.hasEmployees&&!allNomOk;return<div key={o.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 9px",borderRadius:6,border:`1px solid ${paid&&notif?C.okBorder:C.border}`,background:paid&&notif?C.okBg:C.bg,marginBottom:5}}>
+                <OBadge org={o.org}/><div style={{flex:1}}><div style={{fontSize:12,color:C.navy,fontFamily:F}}>{o.label}{o.monto!=null&&o.monto>0&&<span style={{marginLeft:8,fontSize:11,color:C.okTxt,fontWeight:700}}>$ {o.monto.toLocaleString("es-UY")}</span>}</div>{blocked&&<div style={{fontSize:10,color:C.warnTxt,fontFamily:F}}>Marcar todas las nóminas antes de pagar BPS</div>}{o.form&&<span style={{fontSize:10,color:C.blueTxt,fontFamily:F}}>Form. {o.form} </span>}{o.autoCalc&&<span style={{fontSize:10,color:C.okTxt,fontFamily:F}}>Cálculo auto</span>}</div>
+                {o.url&&<button onClick={()=>openUrl(EXT[o.url])} style={{background:"transparent",border:`1px solid ${C.border}`,borderRadius:3,padding:"2px 7px",fontSize:10,cursor:"pointer",color:C.blueTxt,fontFamily:F}}>{o.url.toUpperCase()} ↗</button>}
+                {blocked?<div style={{opacity:.3}}><Check checked={paid} onChange={()=>{}} color={C.ok}/></div>:<Check checked={paid} onChange={()=>setOb(o.id,"paid")} color={C.ok}/>}
+                <Check checked={notif} onChange={()=>setOb(o.id,"notified")} color={C.blue}/>
+              </div>;})}
+            </div>)}
+          </div>}
       </div>}
 
       {/* OPERATIVO */}
@@ -3015,9 +3108,15 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
             <div style={{fontWeight:600,color:C.navy,fontSize:13,fontFamily:F,display:"flex",alignItems:"center",gap:7}}>
               <div style={{width:4,height:14,background:C.blue,borderRadius:2}}/>Boletos a pagar — período {period}
             </div>
-            <button onClick={()=>{const wn=(client.whatsapp||"").replace(/\D/g,"");if(wn.length>5&&boletosDe(client,period,config).some(b=>+getBoleto(b.id).monto>0))openUrl(`https://wa.me/${wn}?text=${encodeURIComponent(boletoWAMsg())}`);else alert("Ingresá los montos y verificá el WhatsApp del cliente.");}} style={{background:"#25D36618",color:"#25D366",border:"1px solid #25D36640",borderRadius:5,padding:"4px 10px",fontSize:11,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:5}}>
-              <Logo src={LOGO_WA} size={14} style={{borderRadius:2}}/>Enviar importes
-            </button>
+            <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              {+client.studyFee>0&&<label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer"}}>
+                <Check checked={waHon} onChange={toggleWaHon} color={C.blue}/>
+                <span style={{fontSize:11,color:C.gray,fontFamily:F}}>Sumar honorarios (${(+client.studyFee).toLocaleString("es-UY")})</span>
+              </label>}
+              <button onClick={()=>{const wn=(client.whatsapp||"").replace(/\D/g,"");if(wn.length>5&&boletosDe(client,period,config).some(b=>+getBoleto(b.id).monto>0))openUrl(`https://wa.me/${wn}?text=${encodeURIComponent(boletoWAMsg())}`);else alert("Ingresá los montos y verificá el WhatsApp del cliente.");}} style={{background:"#25D36618",color:"#25D366",border:"1px solid #25D36640",borderRadius:5,padding:"4px 10px",fontSize:11,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:5}}>
+                <Logo src={LOGO_WA} size={14} style={{borderRadius:2}}/>Enviar importes
+              </button>
+            </div>
           </div>
           <div style={{display:"grid",gridTemplateColumns:cdM?"1fr":"1fr 1fr",gap:10}}>
             {boletosDe(client,period,config).map(({id:org,label,color:col,logo,vto:vtoDef,auto})=>{
@@ -3242,7 +3341,7 @@ function ClientDetail({client,clients,setClients,goBack,user,period,setPeriod,co
         <div style={{background:C.card,borderRadius:10,padding:15,border:`1px solid ${C.border}`,boxShadow:SH.sm}}>
           <div style={{fontWeight:600,color:C.navy,fontSize:13,marginBottom:9,fontFamily:F}}>Mensajes WhatsApp</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-            {[{l:"Vencimiento",m:`Hola, te recuerdo que el próximo vencimiento es el 22/${period}.`},{l:"Honorario pend.",m:`Hola, el honorario del período ${period} está pendiente.`},{l:"Pago confirmado",m:`Hola, confirmamos que el pago fue procesado correctamente.`},{l:"Documentación",m:`Hola, necesitamos documentación para el período ${period}.`}].map(msg=>(
+            {[{l:"Vencimiento",m:`Hola, te recuerdo los vencimientos del período ${period}: DGI el ${vtoDGI(period,config?.diaDGI,client.grupoDGI)} y BPS el ${vtoBPS(period,config?.diaBPS)}.`},{l:"Honorario pend.",m:`Hola, el honorario del período ${period}${+client.studyFee>0?` ($${(+client.studyFee).toLocaleString("es-UY")})`:""} está pendiente.`},{l:"Pago confirmado",m:`Hola, confirmamos que el pago fue procesado correctamente.`},{l:"Documentación",m:`Hola, necesitamos documentación para el período ${period}.`}].map(msg=>(
               <button key={msg.l} onClick={()=>{const n=client.whatsapp.replace(/\D/g,"");if(n)openUrl(`https://wa.me/${n}?text=${encodeURIComponent(msg.m)}`);}} style={{background:C.okBg,color:"#047857",border:"1px solid #A7F3D0",borderRadius:5,padding:"5px 10px",fontSize:11,cursor:"pointer",fontFamily:F,display:"flex",alignItems:"center",gap:4}}>
                 <Logo src={LOGO_WA} size={11} style={{padding:1,borderRadius:2}}/>{msg.l}
               </button>
@@ -3285,7 +3384,8 @@ function CalendarioView({clients,config,openClient,globalPeriod}){
       const cargo=prevP(calPeriod);
       const obs=getObs(c,cargo);
       obs.filter(o=>o.freq==="mensual").forEach(o=>{
-        const dueDay=o.org==="BPS"?(config.diaBPS||10):(config.diaDGI||22);
+        // El día sale del calendario oficial: DGI según el grupo del cliente, BPS por internet
+        const dueDay=+(o.org==="BPS"?vtoBPS(cargo,config.diaBPS):vtoDGI(cargo,config.diaDGI,c.grupoDGI)).slice(0,2);
         addEv(dueDay,{client:c,type:"obligation",label:`${o.label} · período ${cargo}`,org:o.org||"DGI"});
       });
     }
@@ -3330,7 +3430,7 @@ function CalendarioView({clients,config,openClient,globalPeriod}){
         </div>
         {/* Leyenda */}
         <div style={{display:"flex",gap:12,marginTop:8,flexWrap:"wrap",flexShrink:0}}>
-          {[["DGI",`Vto. día ${config.diaDGI||22}`],["BPS",`Vto. día ${config.diaBPS||10}`],["BSE","BSE"],["Otro","Tareas/Otros"]].map(([org,hint])=>(
+          {[["DGI","según CEDE / NO CEDE"],["BPS",`día ${config.diaBPS||DIA_BPS_WEB}`],["BSE","accidentes laborales"],["Otro","tareas"]].map(([org,hint])=>(
             <div key={org} style={{display:"flex",alignItems:"center",gap:4}}>
               <div style={{width:8,height:8,borderRadius:2,background:orgCol[org]||C.gray}}/>
               <span style={{fontSize:10,color:C.gray,fontFamily:F}}>{org} — {hint}</span>
@@ -3504,8 +3604,14 @@ function ConfigPanel({config,setConfig,tema,setTema}){
         <div><label style={lbl}>Contraseña secretaria</label><input value={config.secretariaPass||"secr123"} onChange={e=>set("secretariaPass",e.target.value)} style={inp}/></div>
       </FormSection>
       <FormSection title="Vencimientos mensuales (día del mes)">
-        <div><label style={lbl}>Día vencimiento DGI</label><input type="number" min="1" max="31" value={config.diaDGI||22} onChange={e=>set("diaDGI",+e.target.value)} style={inp}/></div>
-        <div><label style={lbl}>Día vencimiento BPS</label><input type="number" min="1" max="31" value={config.diaBPS||10} onChange={e=>set("diaBPS",+e.target.value)} style={inp}/></div>
+        <div><label style={lbl}>Día vencimiento BPS</label><input type="number" min="1" max="31" value={config.diaBPS||DIA_BPS_WEB} onChange={e=>set("diaBPS",+e.target.value)} style={inp}/>
+          <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>Pagando por internet vence siempre el {DIA_BPS_WEB}.</div></div>
+        <div><label style={lbl}>Día vencimiento DGI (respaldo)</label><input type="number" min="1" max="31" value={config.diaDGI||22} onChange={e=>set("diaDGI",+e.target.value)} style={inp}/>
+          <div style={{fontSize:10.5,color:C.gray,fontFamily:F,marginTop:3}}>Sólo se usa para años sin calendario cargado.</div></div>
+        <div style={{gridColumn:"1/-1",background:C.bg,borderRadius:8,padding:"9px 12px",fontSize:11,color:C.gray,fontFamily:F,lineHeight:1.55}}>
+          El vencimiento de DGI sale del <b style={{color:C.navy}}>calendario general {Object.keys(VTO_DGI).join(", ")}</b>, que cambia mes a mes: CEDE {VTO_DGI[2026].cede.join(" · ")} · NO CEDE {VTO_DGI[2026].nocede.join(" · ")}.
+          Cada cliente se marca CEDE o NO CEDE en su ficha, en Datos.
+        </div>
       </FormSection>
       <FormSection title="Valores de referencia fiscal">
         {[["bpc","BPC (pesos)"],["ui","UI (pesos)"],["iraeMinimoMensual","Anticipo IRAE mínimo mensual ($)"],["ivaMinimo","IVA Mínimo Lit. E mensual ($)"],["monotributoA","Monotributo Categoría A ($)"],["monotributoB","Monotributo Categoría B ($)"],["icosaAnual","ICOSA – Anticipo anual S.A. ($)"]].map(([k,l])=><div key={k}><label style={lbl}>{l}</label><input type="number" step="0.01" value={config[k]||0} onChange={e=>set(k,+e.target.value)} style={inp}/></div>)}
@@ -3677,7 +3783,7 @@ export default function Obligo(){
   const [closedPeriods,setClosedPeriods]=useState([]);
   const [proveedores,setProveedores]=useState([]);
   // Valores fiscales vigentes 2026, los mismos que usa el otro estudio
-  const CONFIG_DEFAULT={studioName:"Estudio Valeria Calvette",studioCode:"VCEstudio",studioRut:"",studioEmail:"",studioPhone:"",adminPass:"admin123",secretariaPass:"secr123",diaDGI:22,diaBPS:10,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000,cotizaciones:[]};
+  const CONFIG_DEFAULT={studioName:"Estudio Valeria Calvette",studioCode:"VCEstudio",studioRut:"",studioEmail:"",studioPhone:"",adminPass:"admin123",secretariaPass:"secr123",diaDGI:22,diaBPS:DIA_BPS_WEB,bpc:6864,ui:6.5720,iraeMinimoMensual:6840,ivaMinimo:5910,monotributoA:2800,monotributoB:5500,icosaAnual:0,icosaMensual:0,salarioMinimo:24572,limiteMonotributoUI:305000,limiteLiteralEUI:4000000,limite4MUI:4000000,cotizaciones:[]};
   const [config,setConfig]=useState(()=>{
     try{const s=localStorage.getItem('gc_config');if(s)return{...CONFIG_DEFAULT,...JSON.parse(s)};}catch(e){}
     return CONFIG_DEFAULT;
@@ -3706,7 +3812,7 @@ export default function Obligo(){
         lsCfg={...lsCfg,bpc:LASER_CONFIG_DEFAULT.bpc,ui:LASER_CONFIG_DEFAULT.ui,salarioMinimo:LASER_CONFIG_DEFAULT.salarioMinimo,ivaMinimo:LASER_CONFIG_DEFAULT.ivaMinimo,iraeMinimoMensual:LASER_CONFIG_DEFAULT.iraeMinimoMensual};
         try{localStorage.setItem('ls_seed',LASER_SEED_V);localStorage.setItem('ls_clients',JSON.stringify(lsC));localStorage.setItem('ls_config',JSON.stringify(lsCfg));}catch(e){}
       }
-      setClients(lsC);setConfig(lsCfg);
+      setClients(lsC);setConfig(migrarVtos(lsCfg,'ls_vtos'));
     }
     else{
       let gcCfg=loadObj('gc_config',CONFIG_DEFAULT);
@@ -3717,7 +3823,7 @@ export default function Obligo(){
         gcCfg={...gcCfg,bpc:CONFIG_DEFAULT.bpc,ui:CONFIG_DEFAULT.ui,salarioMinimo:CONFIG_DEFAULT.salarioMinimo,ivaMinimo:CONFIG_DEFAULT.ivaMinimo,iraeMinimoMensual:CONFIG_DEFAULT.iraeMinimoMensual};
         try{localStorage.setItem('gc_valores',VC_VALORES_V);localStorage.setItem('gc_config',JSON.stringify(gcCfg));}catch(e){}
       }
-      setClients(loadList('gc_clients',CLIENTS_INIT));setConfig(gcCfg);
+      setClients(loadList('gc_clients',CLIENTS_INIT));setConfig(migrarVtos(gcCfg,'gc_vtos'));
     }
     setView("dashboard");setClientId(null);
     setAuthUser(u);
