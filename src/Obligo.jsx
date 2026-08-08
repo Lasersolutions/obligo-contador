@@ -2064,6 +2064,13 @@ function generarReportePDF(empresas,period,config,notaGeneral){
     return sp;
   };
   const hayRef=empresas.some(e=>e.lines.some(l=>(l.ref||"").trim()));
+  // Cuánto va a cada organismo. El orden es el de siempre: primero DGI, después BPS.
+  const ORDEN_ORG=["DGI","BPS","BSE","Estudio","Otro"];
+  const porOrganismo=(lines)=>{
+    const acum={};
+    lines.forEach(l=>{if(l.amount==null||l.amount==="")return;const k=ORDEN_ORG.includes(l.org)?l.org:"Otro";acum[k]=(acum[k]||0)+(+l.amount||0);});
+    return ORDEN_ORG.filter(k=>acum[k]!=null).map(k=>[k,acum[k]]);
+  };
   const secciones=empresas.map(({client,lines,nota})=>{
     const sub=lines.reduce((x,l)=>x+(+l.amount||0),0);
     const sp=spanRef(lines);
@@ -2076,7 +2083,9 @@ function generarReportePDF(empresas,period,config,notaGeneral){
           <td>${l.label}</td>${hayRef?(sp[i]?`<td class="ref" rowspan="${sp[i]}">${(l.ref||"").trim()||"—"}</td>`:""):""}<td>${l.due||"—"}</td>
           <td class="num">${l.amount!=null&&l.amount!==""?"$ "+fU(+l.amount,2):"—"}</td></tr>`).join("")}
         </tbody>
-        <tfoot><tr><td colspan="${hayRef?4:3}">Subtotal ${client.name}</td><td class="num">$ ${fU(sub,2)}</td></tr></tfoot>
+        <tfoot>${porOrganismo(lines).map(([org,monto])=>`<tr class="sub-org">
+          <td colspan="${hayRef?4:3}">Subtotal ${org==="Estudio"?"honorarios del estudio":org}</td><td class="num">$ ${fU(monto,2)}</td></tr>`).join("")}
+        <tr><td colspan="${hayRef?4:3}">Total ${client.name}</td><td class="num">$ ${fU(sub,2)}</td></tr></tfoot>
       </table>
       ${nota?`<div class="nota"><b>Nota:</b> ${nota}</div>`:""}
     </div>`;
@@ -2103,10 +2112,14 @@ function generarReportePDF(empresas,period,config,notaGeneral){
     .ref{font-family:'IBM Plex Mono',ui-monospace,Consolas,monospace;font-size:10.5px;color:${B.navy};border-left:1px solid #EDF1F9;border-right:1px solid #EDF1F9;background:${B.fondo}66}
     .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
     tfoot td{background:${B.fondo};font-weight:800;color:${B.navy};border-top:2px solid ${B.navy}}
+    tfoot .sub-org td{font-weight:600;color:#5B6B8C;border-top:none;background:${B.fondo}80;font-size:10.5px;padding:4.5px 10px}
+    tfoot .sub-org:first-child td{border-top:2px solid ${B.navy}}
+    tfoot tr:last-child td{border-top:1px solid ${B.borde}}
     .nota{background:#FFFBEB;border:1px solid #FDE68A;border-radius:0 0 8px 8px;padding:7px 11px;font-size:10.5px;color:#78350F}
     .grantotal{background:${B.navy};color:#fff;border-radius:10px;padding:13px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:6px}
     .grantotal .gt1{font-size:12px;font-weight:700;letter-spacing:.5px}
     .grantotal .gt2{font-size:19px;font-weight:800;color:${B.suave}}
+    .grantotal .gt3{font-size:10px;color:${B.suave};font-weight:600;margin-top:3px;opacity:.9}
     .notagen{margin-top:14px;background:${B.fondo};border-radius:8px;padding:10px 13px;font-size:11px;color:#33405e}
     .foot{margin-top:26px;border-top:1px solid ${B.borde};padding-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:9.5px;color:#7a87a6}
     .foot .obligo{display:flex;align-items:center;gap:5px;opacity:.75}
@@ -2122,7 +2135,7 @@ function generarReportePDF(empresas,period,config,notaGeneral){
     </div>
     <div class="intro">Detalle de obligaciones tributarias y de seguridad social del período, preparado por ${B.nombre}.${empresas.length>1?` Incluye ${empresas.length} empresas del grupo, con el detalle de cada una por separado.`:""}</div>
     ${secciones}
-    <div class="grantotal"><div class="gt1">TOTAL A PREVER DEL PERÍODO${empresas.length>1?" (todas las empresas)":""}</div><div class="gt2">$ ${fU(tot,2)}</div></div>
+    <div class="grantotal"><div><div class="gt1">TOTAL A PREVER DEL PERÍODO${empresas.length>1?" (todas las empresas)":""}</div>${(()=>{const g=porOrganismo(empresas.flatMap(e=>e.lines));return g.length>1?`<div class="gt3">${g.map(([org,m])=>`${org==="Estudio"?"Honorarios":org} $ ${fU(m,2)}`).join(" · ")}</div>`:"";})()}</div><div class="gt2">$ ${fU(tot,2)}</div></div>
     ${notaGeneral?`<div class="notagen"><b>Notas:</b> ${notaGeneral}</div>`:""}
     <div class="foot"><span>${B.nombre}${config?.studioEmail?` · ${config.studioEmail}`:""} · Generado el ${TODAY.split("-").reverse().join("/")}</span><span class="obligo"><img src="${LOGO_OBLIGO}" alt=""/>Hecho con Obligo</span></div>
     <script>window.onload=function(){setTimeout(function(){window.print();},400);};</script>
